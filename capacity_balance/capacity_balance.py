@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import linear_sum_assignment
 
-database_filepath = "C:\\Modules\\Database\\chemspeedDB.db"
+DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
 
 # Sorting method. 1 = Cost Matrix, 2 = Sort by weight, 3 = Do not sort
 # However, right now there is no way to pass arguments to the script with AutoSuite
@@ -13,10 +13,10 @@ if len(sys.argv) >= 2:
 else:
     sorting_method = 1
 
-print(f'Reading from database {database_filepath}, using sorting method {sorting_method}')
+print(f'Reading from database {DATABASE_FILEPATH}, using sorting method {sorting_method}')
 
 # Connect to the database and create the Cell_Assembly_Table
-with sqlite3.connect(database_filepath) as conn:
+with sqlite3.connect(DATABASE_FILEPATH) as conn:
     # Read the table Cell_Assembly_Table from the database
     df = pd.read_sql("SELECT * FROM Cell_Assembly_Table", conn)
 
@@ -125,7 +125,7 @@ with sqlite3.connect(database_filepath) as conn:
             df.loc[row_indices, column] = df_immutable.loc[row_indices[cathode_ind], column].values
 
     # Find the accepted and rejected cells
-    df["Actual N:P Ratio"] = (df["Anode Capacity (mAh)"] / df["Cathode Capacity (mAh)"])
+    df["Actual N:P Ratio"] = df["Anode Capacity (mAh)"] / df["Cathode Capacity (mAh)"]
     cell_meets_criteria = ((df["Actual N:P Ratio"] >= df["Minimum N:P Ratio"]) 
                             & (df["Actual N:P Ratio"] <= df["Maximum N:P Ratio"]))
     accepted_cell_indices = np.where(cell_meets_criteria)[0]
@@ -141,6 +141,6 @@ with sqlite3.connect(database_filepath) as conn:
         df.loc[cell_index, "Cell Number"] = cell_number + 1
 
     # Write the updated table back to the database
-    print(f'Read and manipulated data from database')
-    df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace")
+    print('Read and manipulated data from database')
+    # df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace")
     print('Updated database successfully')

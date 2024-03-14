@@ -4,7 +4,7 @@ import sqlite3
 import numpy as np
 import pandas as pd
 
-database_filepath = "C:\\Modules\\Database\\chemspeedDB.db"
+DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
 
 if len(sys.argv) >= 2:
     input_filepath = sys.argv[1]
@@ -15,7 +15,7 @@ else:
         )
 
 print(f'Input Excel file: {input_filepath}')
-print(f'Output database: {database_filepath}')
+print(f'Output database: {DATABASE_FILEPATH}')
 
 # Read the excel file
 df = pd.read_excel(input_filepath, sheet_name="Input Table")
@@ -69,10 +69,10 @@ df.loc[df["Cathode Type"].notnull(), "Cathode Rack Position"] = df["Rack Positio
 df.loc[df["Anode Type"].notnull(), "Anode Weight (mg)"] = 0
 df.loc[df["Cathode Type"].notnull(), "Cathode Weight (mg)"] = 0
 
-print(f'Successfully read and manipulated the Excel file.')
+print('Successfully read and manipulated the Excel file.')
 
 # Connect to the database and create the Cell_Assembly_Table
-with sqlite3.connect(database_filepath) as conn:
+with sqlite3.connect(DATABASE_FILEPATH) as conn:
     df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace")
     df_press.to_sql("Press_Table", conn, index=False, if_exists="replace")
     df_electrolyte.to_sql("Electrolyte_Table", conn, index=False, if_exists="replace")

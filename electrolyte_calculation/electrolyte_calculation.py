@@ -2,9 +2,9 @@ import sqlite3
 import numpy as np
 import pandas as pd
 
-database_filepath = "C:\\Modules\\Database\\chemspeedDB.db"
+DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
 
-with sqlite3.connect(database_filepath) as conn:
+with sqlite3.connect(DATABASE_FILEPATH) as conn:
     # Read the tables from the database
     df = pd.read_sql("SELECT * FROM Cell_Assembly_Table", conn)
     df_electrolyte = pd.read_sql("SELECT * FROM Electrolyte_Table", conn)
@@ -43,19 +43,19 @@ with sqlite3.connect(database_filepath) as conn:
     # create the mixing table with volumes to mix
     mixing_matrix = mix_fractions * volumes[:, np.newaxis]
 
-    df_mixing_table = pd.DataFrame(columns=["Source Position", "Target Position", "Volume (uL)"])
+    source_positions = []
+    target_positions = []
+    volumes_to_mix = []
     for i in range(number_of_electrolyte_positions):
         for j in range(number_of_electrolyte_positions):
-            if mixing_matrix[i, j] != 0:
-                df_mixing_table = df_mixing_table._append(
-                    {
-                        "Source Position": j + 1,
-                        "Target Position": i + 1,
-                        "Volume (uL)": mixing_matrix[i, j],
-                    },
-                    ignore_index=True
-                )
-                
+            if mixing_matrix[i, j] > 0:
+                source_positions.append(j + 1)
+                target_positions.append(i + 1)
+                volumes_to_mix.append(mixing_matrix[i, j])
+
+    df_mixing_table = pd.DataFrame(columns=["Source Position", "Target Position", "Volume (uL)"],
+                                   data=zip(source_positions, target_positions, volumes_to_mix))
+
     df_mixing_table.to_sql(
         "Mixing_Table",
         conn,
@@ -67,3 +67,4 @@ with sqlite3.connect(database_filepath) as conn:
                "Volume (uL)": "REAL",
         }
     )
+    print('Successfully calculated the electrolyte volumes and wrote the tables back to the database.')
