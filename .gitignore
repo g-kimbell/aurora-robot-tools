@@ -1,0 +1,5 @@
+# ignore all executables
+*.exe
+
+# ignore all ipython notebooks, which are mainly used for testing
+*.ipynb
