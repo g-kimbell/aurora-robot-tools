@@ -1,3 +1,15 @@
+"""
+Read the user input Excel file and write the data to a SQL database.
+
+Users should use the prepared Excel file, "Input with electrode table.xlsx", to input all of the parameters of the cells
+to be assembled. The script reads the file, does some simple manipulation, and writes the data to the 
+"Cell_Assembly_Table" in the chemspeedDB database, which is used by the AutoSuite software to assemble the cells.
+
+Usage:
+    The script is called from an executable, import_excel.exe, which is called from the AutoSuite software.
+    It can also be called from the command line.
+"""
+
 import sys
 import os
 import sqlite3

@@ -1,3 +1,40 @@
+"""
+Match cathodes with anodes to achieve the desired N:P ratio.
+
+The script reads the weights measured by the cell assembly robot, along with other input parameters, from the
+Cell_Assembly_Table in the chemspeedDB database. The preferred method calculates every possible N:P ratio from all
+anodes and cathode combinations, then uses the linear sum assignment algorithm to find the optimal matching of anodes
+and cathodes. The script then writes the updated table back to the database, which is used by the AutoSuite software to
+assemble the cells.
+
+The electrode matching is done in batches (defined in the input excel table), so only electrodes within the same batch
+are switched around. This is useful if there are different cell chemistries within one run of the robot.
+
+Note: currently the script only moves the cathodes and not the anode positions. This means that each anode is tied to
+its target N:P ratio, so the sorting is not optimal if the user requires different N:P ratios within one batch of cells.
+
+Usage:
+    The script is called from an executable, capacity_balance.exe, which is called from the AutoSuite software.
+    It can also be called from the command line.
+
+    There is one additional parameter that can be set:
+
+    - `sorting_method`:
+        1 - Use the cost matrix method to match the cathodes with the anodes.
+        2 - Sort the anodes and cathodes by weight.
+        3 - Do not sort the anodes and cathodes.
+    
+    The cost matrix method is always the best option, but the other methods are included for legacy, comparison and 
+    testing purposes.
+
+TODO:
+    - Add a 3D sorting method, in which anodes can also switch positions. This would be useful if the user requires
+      different N:P ratios within one batch of cells.
+    - Make rejection_cost_factor an argument when AutoSuite supports it.
+    - [Long term] Pre-calculate the possible matchings using different rejection_cost_factors and allow the user to
+      choose the best one.
+"""
+
 import sys
 import sqlite3
 import numpy as np
@@ -23,7 +60,7 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
     # Calculate the capacity of the anodes and cathodes
     df["Anode Capacity (mAh)"] = ((df["Anode Weight (mg)"] - df["Anode Current Collector Weight (mg)"])
         * df["Anode Active Material Weight Fraction"] * df["Anode Practical Capacity (mAh/g)"])
-    
+
     df["Cathode Capacity (mAh)"] = ((df["Cathode Weight (mg)"] - df["Cathode Current Collector Weight (mg)"])
         * df["Cathode Active Material Weight Fraction"] * df["Cathode Practical Capacity (mAh/g)"])
 
