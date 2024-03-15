@@ -28,8 +28,6 @@ Usage:
     testing purposes.
 
 TODO:
-    - Add a 3D sorting method, in which anodes can also switch positions. This would be useful if the user requires
-      different N:P ratios within one batch of cells.
     - Make rejection_cost_factor an argument when AutoSuite supports it.
     - [Long term] Pre-calculate the possible matchings using different rejection_cost_factors and allow the user to
       choose the best one.
@@ -37,11 +35,14 @@ TODO:
 
 import sys
 import sqlite3
+import itertools
 import numpy as np
 import pandas as pd
 from scipy.optimize import linear_sum_assignment
+import pulp
 
 DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
+
 
 def calculate_capacity(df):
     """Calculate the capacity of the anodes and cathodes in-place in the main dataframe, df.
@@ -53,6 +54,7 @@ def calculate_capacity(df):
         * df["Anode Active Material Weight Fraction"] * df["Anode Practical Capacity (mAh/g)"])
     df["Cathode Capacity (mAh)"] = ((df["Cathode Weight (mg)"] - df["Cathode Current Collector Weight (mg)"])
         * df["Cathode Active Material Weight Fraction"] * df["Cathode Practical Capacity (mAh/g)"])
+
 
 def cost_matrix_assign(df, rejection_cost_factor = 2):
     """Calculate the cost matrix and find the optimal matching of anodes and cathodes.
@@ -69,10 +71,10 @@ def cost_matrix_assign(df, rejection_cost_factor = 2):
     """
     # Calculate all possible N:P ratios
     actual_ratio = np.outer(df["Anode Capacity (mAh)"], 1 / df["Cathode Capacity (mAh)"])
-    n_batch,_ = actual_ratio.shape
+    n = actual_ratio.shape[0]
 
     # Cells outside N:P ratio limits are rejected, given the same cost scaled by rejection_cost_factor
-    for i in range(n_batch):
+    for i in range(n):
         actual_ratio[i, actual_ratio[i] > df["Maximum N:P Ratio"].loc[i]] = (
             df["Maximum N:P Ratio"].loc[i] * rejection_cost_factor
         )
@@ -81,11 +83,11 @@ def cost_matrix_assign(df, rejection_cost_factor = 2):
         )
 
     # Calculate the cost matrix
-    cost_matrix = np.abs(actual_ratio - np.outer(df["Target N:P Ratio"], np.ones(n_batch)))
+    cost_matrix = np.abs(actual_ratio - np.outer(df["Target N:P Ratio"], np.ones(n)))
 
     # Prefer unassigned cathodes to not swap with each other
     # by making nans on the diagonal cost very slightly less
-    for i in range(n_batch):
+    for i in range(n):
         if np.isnan(cost_matrix[i, i]):
             cost_matrix[i, i] = 999.99999999
     # otherwise unassigned cells have the same cost
@@ -95,6 +97,133 @@ def cost_matrix_assign(df, rejection_cost_factor = 2):
     anode_ind, cathode_ind = linear_sum_assignment(cost_matrix, maximize=False)
 
     return anode_ind, cathode_ind
+
+
+def exact_npartite_matching(cost_matrix):
+    """Find the optimal matching of anodes and cathodes using an exact 3D matching algorithm.
+    This algorithm his NP-hard and can take a very long time for n>10"""
+    # Get the size of the cost matrix
+    n = cost_matrix.shape[0]
+
+    # Create a list of all possible assignments (each assignment is a tuple of 3 indices)
+    assignments = list(itertools.product(range(n), repeat=3))
+
+    # Create a binary variable for each assignment
+    x = pulp.LpVariable.dicts('x', assignments, cat=pulp.LpBinary)
+
+    # Create the problem
+    problem = pulp.LpProblem('3D_assignment', pulp.LpMinimize)
+
+    # The objective is to minimize the total cost of the chosen assignments
+    problem += pulp.lpSum(cost_matrix[a]*x[a] for a in assignments)
+
+    # Add constraints ensuring each x, y, and z is used exactly once
+    for i in range(n):
+        problem += pulp.lpSum(x[a] for a in assignments if a[0] == i) == 1
+        problem += pulp.lpSum(x[a] for a in assignments if a[1] == i) == 1
+        problem += pulp.lpSum(x[a] for a in assignments if a[2] == i) == 1
+
+    # Solve the problem
+    problem.solve(pulp.PULP_CBC_CMD(options=['sec=20']))
+    print(pulp.LpStatus[problem.status])
+    if pulp.LpStatus[problem.status] != 'Optimal':
+        raise ValueError(f'Optimal solution not found. Status: {pulp.LpStatus[problem.status]}')
+
+    # Get the optimal assignments
+    optimal_assignments = np.array([a for a in assignments if pulp.value(x[a]) == 1])
+    i_idx, j_idx, k_idx = optimal_assignments[:,0], optimal_assignments[:,1], optimal_assignments[:,2]
+    return i_idx, j_idx, k_idx
+
+
+def greedy_npartite_matching(cost_matrix):
+    """Find the optimal matching of anodes, cathodes, and target ratios using a greedy algorithm.
+    This will find a suboptimal solution, but does not suffer from combinatoral explosion like the exact method.
+    """
+    # Get the shape of the cost matrix
+    n = cost_matrix.shape[0]
+
+    # Create a list of all possible assignments (each assignment is a tuple of 3 indices)
+    assignments = [(i, j, k) for i in range(n) for j in range(n) for k in range(n)]
+
+    # Sort the assignments by cost
+    assignments.sort(key=lambda a: cost_matrix[a])
+
+    # Initialize the set of used indices for each dimension
+    used_indices = [set() for _ in range(3)]
+
+    # Initialize the list of chosen assignments
+    chosen_assignments = []
+
+    # Iterate over the sorted assignments
+    for a in assignments:
+        # If the indices of this assignment have not been used yet, choose this assignment
+        if all(a[i] not in used_indices[i] for i in range(3)):
+            chosen_assignments.append(a)
+            for i in range(3):
+                used_indices[i].add(a[i])
+    chosen_assignments = np.array(chosen_assignments)
+    i_idx, j_idx, k_idx = chosen_assignments[:,0], chosen_assignments[:,1], chosen_assignments[:,2]
+    return i_idx, j_idx, k_idx
+
+
+def cost_matrix_assign_3d(df, rejection_cost_factor = 2 , exact=False):
+    """Calculate the cost matrix and find the optimal matching of anodes, cathodes, and target ratios using a 3D 
+    matching algorithm.
+
+    Args:
+        df (pandas.DataFrame): The dataframe containing the cell assembly data.
+        rejection_cost_factor (float, optional): The factor by which to scale the cost of rejected cells. Defaults to 2.
+            1 = more rejected cells, better N:P ratio of accepted cells
+            10 = fewer rejected cells, worse N:P ratio of accepted cells
+            2 = compromise
+
+    Returns:
+        tuple: The indices of the optimal matching of anodes and cathodes.
+    """
+    n = len(df)
+
+    # Convert all 1D arrays to 3D n x n x n arrays
+    anode_capacity = np.array(df["Anode Capacity (mAh)"])
+    anode_capacity = np.tile(anode_capacity[:, np.newaxis, np.newaxis], (1, n, n))
+    cathode_capacity = np.array(df["Cathode Capacity (mAh)"])
+    cathode_capacity = np.tile(cathode_capacity[np.newaxis, :, np.newaxis], (n, 1, n))
+    target_ratio = np.array(df["Target N:P Ratio"])
+    target_ratio = np.tile(target_ratio[np.newaxis, np.newaxis, :], (n, n, 1))
+    min_ratio = np.array(df["Minimum N:P Ratio"])
+    min_ratio = np.tile(min_ratio[np.newaxis, np.newaxis, :], (n, n, 1))
+    max_ratio = np.array(df["Maximum N:P Ratio"])
+    max_ratio = np.tile(max_ratio[np.newaxis, np.newaxis, :], (n, n, 1))
+
+    # Calculate the 3D cost matrix
+    cost_matrix = anode_capacity/cathode_capacity - target_ratio
+
+    # If the cost diff is negative, divide by (min_ratio - target_ratio)
+    neg_mask = cost_matrix < 0
+    cost_matrix[neg_mask] = cost_matrix[neg_mask]/(min_ratio[neg_mask] - target_ratio[neg_mask])
+
+    # If the cost diff is positive, divide by (max_ratio - target_ratio)
+    pos_mask = cost_matrix > 0
+    cost_matrix[pos_mask] = cost_matrix[pos_mask]/(max_ratio[pos_mask] - target_ratio[pos_mask])
+
+    # If the normalised cost is over 1 the cell is rejected, so set the cost to the rejection_cost_factor
+    cost_matrix[cost_matrix > 1] = rejection_cost_factor
+
+    # Set NaNs to a very large number, diagonal elements slightly less so unassigned electrodes are not moved
+    for i in range(n):
+        if np.isnan(cost_matrix[i, i, i]):
+            cost_matrix[i, i, i] = 999.999
+    cost_matrix = np.nan_to_num(cost_matrix, nan=1000)
+
+    # Find the optimal matching of anodes and cathodes using greedy algorithm
+    if exact:
+        anode_ind, cathode_ind, ratio_ind = exact_npartite_matching(cost_matrix)
+    else:
+        anode_ind, cathode_ind, ratio_ind = greedy_npartite_matching(cost_matrix)
+    ind_sort=np.argsort(ratio_ind)
+
+    # Sort such that the anode and cathodes move, ratio stays the same order
+    return anode_ind[ind_sort], cathode_ind[ind_sort]
+
 
 def rearrange_electrode_columns(df, row_indices, anode_ind, cathode_ind):
     """Rearrange the anode and cathode columns in-place in the main dataframe, df, 
@@ -132,6 +261,7 @@ def rearrange_electrode_columns(df, row_indices, anode_ind, cathode_ind):
     for column in cathode_columns:
         df.loc[row_indices, column] = df_immutable.loc[row_indices[cathode_ind], column].values
 
+
 def update_cell_numbers(df):
     """Update the cell numbers in the main dataframe, df, based on the accepted cells.
     
@@ -153,6 +283,7 @@ def update_cell_numbers(df):
     for cell_number, cell_index in enumerate(accepted_cell_indices):
         df.loc[cell_index, "Cell Number"] = cell_number + 1
 
+
 def main():
     """Read the cell assembly data from the database, calculate the capacity of the anodes and cathodes, and match the
     cathodes with the anodes to achieve the desired N:P ratio. Write the updated table back to the database.
@@ -160,7 +291,7 @@ def main():
     if len(sys.argv) >= 2:
         sorting_method = int(sys.argv[1])
     else:
-        sorting_method = 1
+        sorting_method = 5
 
     print(f'Reading from database {DATABASE_FILEPATH}, using sorting method {sorting_method}')
 
@@ -194,6 +325,30 @@ def main():
                 case 3: # Do not sort
                     anode_ind = np.arange(len(row_indices))
                     cathode_ind = np.arange(len(row_indices))
+
+                case 4: # Use greedy 3D matching
+                    anode_ind, cathode_ind = cost_matrix_assign_3d(df_batch)
+
+                case 5: # Use exact 3D matching
+                    try:
+                        anode_ind, cathode_ind = cost_matrix_assign_3d(df_batch,exact=True)
+                    except ValueError:
+                        print('Exact matching took too long, using greedy matching instead')
+                        anode_ind, cathode_ind = cost_matrix_assign_3d(df_batch)
+
+                case 6: # Choose automatically
+                    # If all ratios are the same, use 2d matching
+                    if (len(df_batch["Target N:P Ratio"].unique()) == 1 &
+                        len(df_batch["Minimum N:P Ratio"].unique()) == 1 &
+                        len(df_batch["Maximum N:P Ratio"].unique()) == 1):
+                        anode_ind, cathode_ind = cost_matrix_assign(df_batch)
+                    # Otherwise, try exact matching for 10 seconds, otherwise give up and use greedy matching
+                    else:
+                        try:
+                            anode_ind, cathode_ind = cost_matrix_assign_3d(df_batch,exact=True)
+                        except ValueError:
+                            print('Exact matching took too long, using greedy matching instead')
+                            anode_ind, cathode_ind = cost_matrix_assign_3d(df_batch)
 
             # Rearrange the electrodes in the main dataframe
             rearrange_electrode_columns(df, row_indices, anode_ind, cathode_ind)
