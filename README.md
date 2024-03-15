@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://github.com/g-kimbell/bender_tools/assets/88666181/e869093d-db36-47d5-afb7-4420e3a60db5" width="100" align="center" alt="Bender Tools logo">
+</p>
+
 # Bender Tools
 Scripts for the Aurora battery assembly robot at Empa, also known as Bender.
 
