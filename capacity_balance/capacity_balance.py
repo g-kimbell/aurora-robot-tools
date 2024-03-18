@@ -1,20 +1,22 @@
 """
 Match cathodes with anodes to achieve the desired N:P ratio.
 
-The script reads the weights measured by the cell assembly robot, along with other input parameters, from the
-Cell_Assembly_Table in the chemspeedDB database. The preferred method calculates every possible N:P ratio from all
-anodes and cathode combinations, then uses the linear sum assignment algorithm to find the optimal matching of anodes
-and cathodes. The script then writes the updated table back to the database, which is used by the AutoSuite software to
-assemble the cells.
+The script reads the weights measured by the cell assembly robot, along with other input parameters,
+from the Cell_Assembly_Table in the chemspeedDB database. The preferred method calculates every
+possible N:P ratio from all anodes and cathode combinations, then uses the linear sum assignment
+algorithm to find the optimal matching of anodes and cathodes. The script then writes the updated
+table back to the database, which is used by the AutoSuite software to assemble the cells.
 
-The electrode matching is done in batches (defined in the input excel table), so only electrodes within the same batch
-are switched around. This is useful if there are different cell chemistries within one run of the robot.
+The electrode matching is done in batches (defined in the input excel table), so only electrodes
+within the same batch are switched around. This is useful if there are different cell chemistries
+within one run of the robot.
 
-Note: currently the script only moves the cathodes and not the anode positions. This means that each anode is tied to
-its target N:P ratio, so the sorting is not optimal if the user requires different N:P ratios within one batch of cells.
+Note: currently the script only moves the cathodes and not the anode positions. This means that each
+anode is tied to its target N:P ratio, so the sorting is not optimal if the user requires different
+N:P ratios within one batch of cells.
 
 Usage:
-    The script is called from an executable, capacity_balance.exe, which is called from the AutoSuite software.
+    The script is called from capacity_balance.exe, which is called from the AutoSuite software.
     It can also be called from the command line.
 
     There is one additional parameter that can be set:
@@ -31,12 +33,13 @@ Usage:
         5 - Use exact 3D matching
                 Optimal if N:P ratios differ within batches, but can be slow
         6 - Choose automatically (default)
-                If N:P ratios do not change, use 2D matching, otherwise use exact 3D, if too slow use greedy 3D
+                If N:P ratios do not change, use 2D matching (method 3), otherwise try exact 3D
+                (method 5), if too slow use greedy 3D (method 4)
 
 TODO:
     - Make rejection_cost_factor an argument when AutoSuite supports it.
-    - [Long term] Pre-calculate the possible matchings using different rejection_cost_factors and allow the user to
-      choose the best one.
+    - [Long term] Pre-calculate the possible matchings using different rejection_cost_factors and 
+      allow the user to choose the best one.
 """
 
 import sys
@@ -69,9 +72,9 @@ def cost_matrix_assign(df, rejection_cost_factor = 2):
 
     Args:
         df (pandas.DataFrame): The dataframe containing the cell assembly data.
-        rejection_cost_factor (float, optional): The factor by which to scale the cost of rejected cells. Defaults to 2.
-            1 = more rejected cells, better N:P ratio of accepted cells
-            10 = fewer rejected cells, worse N:P ratio of accepted cells
+        rejection_cost_factor (float, optional): cost of rejected cells. Defaults to 2.
+            1 = no extra cost for rejecting, more rejected cells, better N:P ratio of accepted cells
+            10 = high cost to reject cells, fewer rejected cells, worse N:P ratio of accepted cells
             2 = compromise
 
     Returns:
@@ -132,7 +135,7 @@ def exact_npartite_matching(cost_matrix):
         problem += pulp.lpSum(x[a] for a in assignments if a[2] == i) == 1
 
     # Solve the problem
-    problem.solve(pulp.PULP_CBC_CMD(options=[f'sec={TIMEOUT_SECONDS}']))
+    problem.solve(pulp.PULP_CBC_CMD(options=[f'sec={TIMEOUT_SECONDS}'],msg=False))
     print(pulp.LpStatus[problem.status])
     if pulp.LpStatus[problem.status] != 'Optimal':
         raise ValueError(f'Optimal solution not found. Status: {pulp.LpStatus[problem.status]}')
@@ -145,7 +148,8 @@ def exact_npartite_matching(cost_matrix):
 
 def greedy_npartite_matching(cost_matrix):
     """Find the optimal matching of anodes, cathodes, and target ratios using a greedy algorithm.
-    This will find a suboptimal solution, but does not suffer from combinatoral explosion like the exact method.
+    This will find a suboptimal solution, but does not suffer from combinatoral explosion like the 
+    exact method.
     """
     # Get the shape of the cost matrix
     n = cost_matrix.shape[0]
@@ -175,14 +179,14 @@ def greedy_npartite_matching(cost_matrix):
 
 
 def cost_matrix_assign_3d(df, rejection_cost_factor = 2 , exact=False):
-    """Calculate the cost matrix and find the optimal matching of anodes, cathodes, and target ratios using a 3D 
-    matching algorithm.
+    """Calculate the cost matrix and find the optimal matching of anodes, cathodes, and target
+    ratios using a 3D matching algorithm.
 
     Args:
         df (pandas.DataFrame): The dataframe containing the cell assembly data.
-        rejection_cost_factor (float, optional): The factor by which to scale the cost of rejected cells. Defaults to 2.
-            1 = more rejected cells, better N:P ratio of accepted cells
-            10 = fewer rejected cells, worse N:P ratio of accepted cells
+        rejection_cost_factor (float, optional): cost of rejected cells. Defaults to 2.
+            1 = no extra cost for rejecting, more rejected cells, better N:P ratio of accepted cells
+            10 = high cost to reject cells, fewer rejected cells, worse N:P ratio of accepted cells
             2 = compromise
 
     Returns:
@@ -281,10 +285,11 @@ def update_cell_numbers(df):
                             & (df["Actual N:P Ratio"] <= df["Maximum N:P Ratio"]))
     accepted_cell_indices = np.where(cell_meets_criteria)[0]
     rejected_cell_indices = np.where(~cell_meets_criteria & ~df["Actual N:P Ratio"].isnull())[0]
-    for i in rejected_cell_indices:
-        print(f'Rack position {i+1} has an N:P ratio of {df["Actual N:P Ratio"].iloc[i]} '
-            f'which is outside the acceptable range of {df["Minimum N:P Ratio"].iloc[i]} '
-            f'to {df["Maximum N:P Ratio"].iloc[i]}')
+    average_deviation = np.mean(np.abs(df["Actual N:P Ratio"][accepted_cell_indices] 
+                                       - df["Target N:P Ratio"][accepted_cell_indices]))
+    print(f'Accepted {len(accepted_cell_indices)} cells'
+          f'with average N:P deviation from target: {average_deviation:.4f}\n'
+          f'Rejected {len(rejected_cell_indices)} cells.')
 
     # Re-write the Cell Number column to only include cells with both anode and cathode
     df["Cell Number"] = None
@@ -293,15 +298,26 @@ def update_cell_numbers(df):
 
 
 def main():
-    """Read the cell assembly data from the database, calculate the capacity of the anodes and cathodes, and match the
-    cathodes with the anodes to achieve the desired N:P ratio. Write the updated table back to the database.
+    """Read the cell assembly data from the database, calculate the capacity of the anodes and
+    cathodes, and match the cathodes with the anodes to achieve the desired N:P ratio. Write the
+    updated table back to the database.
     """
     if len(sys.argv) >= 2:
         sorting_method = int(sys.argv[1])
     else:
         sorting_method = 6
 
-    print(f'Reading from database {DATABASE_FILEPATH}, using sorting method {sorting_method}')
+    sorting_methods = {
+        1: "Do not sort",
+        2: "Sort by capacity",
+        3: "2D cost matrix",
+        4: "Greedy 3D matching",
+        5: "Exact 3D matching",
+        6: "Auto"
+    }
+
+    print(f'Reading from database {DATABASE_FILEPATH}')
+    print(f'Using sorting method: {sorting_methods[sorting_method]}')
 
     # Connect to the database and create the Cell_Assembly_Table
     with sqlite3.connect(DATABASE_FILEPATH) as conn:
