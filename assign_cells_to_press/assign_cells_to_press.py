@@ -1,27 +1,30 @@
 """
 Assigns cell numbers to presses.
 
-Data is read from the Cell_Assembly_Table and Press_Table tables in the chemspeedDB database. The script identifies the 
-cells and presses that are available for assembly, and assigns the cells to presses by updating both tables. The 
-AutoSuite software will then use this information to assemble the appropriate cells.
+Data is read from the Cell_Assembly_Table and Press_Table tables in the chemspeedDB database. The
+script identifies the cells and presses that are available for assembly, and assigns the cells to
+presses by updating both tables. The AutoSuite software will then use this information to assemble
+the appropriate cells.
 
 Usage:
-    The script is called from an executable, assign_cells_to_press.exe, which is called from the AutoSuite software.
+    The script is called from assign_cells_to_press.exe by the AutoSuite software.
     It can also be called from the command line.
 
     There are two additional parameters that can set:
 
     - `link_rack_pos_to_press`:
-        If set, press 1 will only accept cells from rack positions 1, 7, 13, 19, 25, 31. Press 2 only accepts cells from 
-        rack positions 2, 8, 14, 20, 26, 32, and so on.
+        If set, press 1 will only accept cells from rack positions 1, 7, 13, 19, 25, 31. Press 2
+        only accepts cells from rack positions 2, 8, 14, 20, 26, 32, and so on.
 
     - `limit_electrolytes_per_batch`:
         0 - No limit on the number of different electrolytes in a batch of up to 6 cells.
-        n (integer) - Limit the number of different electrolytes in a batch of up to 6 cells to n. This is useful if the 
-            electrolyte is volatile, since the cleaning step between each electrolyte switch is time-consuming.
+        n (integer) - Limit the number of different electrolytes in a batch of up to 6 cells to n.
+            This is useful if the electrolyte is volatile, since the cleaning step between each 
+            electrolyte switch is time-consuming.
 
 TODO:
-    - Make `link_rack_pos_to_press` and `limit_electrolytes_per_batch` arguments when AutoSuite supports it.
+    - Make `link_rack_pos_to_press` and `limit_electrolytes_per_batch` arguments when AutoSuite
+      supports it.
 """
 
 import sqlite3
@@ -43,8 +46,8 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
     available_press_numbers = np.where((df_press["Current Cell Number Loaded"] == 0)
                                         & (df_press["Error Code"] == 0))[0]+1
   
-    # Find rack positions with cells that are assigned for assembly (Cell Number > 0), have not started assembly yet,
-    # and have no error code, and find their associated cell numbers and electrolyte positions
+    # Find rack positions with cells that are assigned for assembly (Cell Number > 0), have not
+    # started assembly, with no error code, and find their cell numbers and electrolyte positions
     available_rack_pos = np.where((df["Cell Number"]>0)
                                     & (df["Last Completed Step"]==0)
                                     & (df["Error Code"]==0))[0]+1
@@ -64,7 +67,7 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
 
     electrolytes_used = []
 
-    # Loop through the 6 presses, for each, check other conditions then assign the first available cell to the press
+    # Loop through presses, check conditions then assign the first available cell to the press
     for press_idx in range(6):
         availability_mask = np.ones(len(available_rack_pos), dtype=bool)
 
