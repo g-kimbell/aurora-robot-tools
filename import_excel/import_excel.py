@@ -1,12 +1,13 @@
 """
 Read the user input Excel file and write the data to a SQL database.
 
-Users should use the prepared Excel file, "Input with electrode table.xlsx", to input all of the parameters of the cells
-to be assembled. The script reads the file, does some simple manipulation, and writes the data to the 
-"Cell_Assembly_Table" in the chemspeedDB database, which is used by the AutoSuite software to assemble the cells.
+Users should use the prepared Excel file, "Input with electrode table.xlsx", to input all of the
+parameters of the cells to be assembled. The script reads the file, does some simple manipulation,
+and writes the data to the "Cell_Assembly_Table" in the chemspeedDB database, which is used by the
+AutoSuite software to assemble the cells.
 
 Usage:
-    The script is called from an executable, import_excel.exe, which is called from the AutoSuite software.
+    The script is called from import_excel.exe by the AutoSuite software.
     It can also be called from the command line.
 """
 
@@ -15,6 +16,10 @@ import os
 import sqlite3
 import numpy as np
 import pandas as pd
+import warnings
+
+# Ignore the pandas data validation warning
+warnings.filterwarnings('ignore', '.*extension is not supported and will be removed.*')
 
 DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
 
@@ -39,7 +44,7 @@ df_electrolyte = pd.read_excel(input_filepath, sheet_name="Electrolyte Propertie
 df["Cell Number"] = None
 n = 1
 for i in range(36):
-    # check if the row has more than 5 elements that are not null, if so increment the battery number
+    # check if the row has more than 5 elements that are not null, if so increment the cell number
     if df.iloc[i].count() > 5:
         df.loc[i, "Cell Number"] = n
         n += 1
@@ -85,8 +90,23 @@ print('Successfully read and manipulated the Excel file.')
 
 # Connect to the database and create the Cell_Assembly_Table
 with sqlite3.connect(DATABASE_FILEPATH) as conn:
-    df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace")
-    df_press.to_sql("Press_Table", conn, index=False, if_exists="replace")
-    df_electrolyte.to_sql("Electrolyte_Table", conn, index=False, if_exists="replace")
+    df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace",
+              dtype={"Anode Rack Position": "INTEGER", 
+                     "Cathode Rack Position": "INTEGER", 
+                     "Cell Number": "INTEGER", 
+                     "Last Completed Step": "INTEGER", 
+                     "Current Press Number": "INTEGER", 
+                     "Error Code": "INTEGER", 
+                     "Casing Type": "TEXT",
+                     "Barcode": "TEXT",
+              }
+    )
+    df_press.to_sql("Press_Table", conn, index=False, if_exists="replace",
+                    dtype={col: "INTEGER" for col in df_press.columns})
+    electrolyte_dtype={col: "REAL" for col in df_electrolyte.columns}
+    electrolyte_dtype["Electrolyte Position"] = "INTEGER"
+    electrolyte_dtype["Electrolyte Name"] = "TEXT"
+    df_electrolyte.to_sql("Electrolyte_Table", conn, index=False, if_exists="replace",
+                          dtype=electrolyte_dtype)
 
-print('Connected to the database and created the Cell_Assembly_Table')
+print('Connected to the database and updated Cell_Assembly_Table, Press_Table, and Electrolyte_Table.')
