@@ -20,12 +20,18 @@ Usage:
     There is one additional parameter that can be set:
 
     - `sorting_method`:
-        1 - Use the cost matrix method to match the cathodes with the anodes.
-        2 - Sort the anodes and cathodes by weight.
-        3 - Do not sort the anodes and cathodes.
-    
-    The cost matrix method is always the best option, but the other methods are included for legacy, comparison and 
-    testing purposes.
+        1 - Do not sort the anodes and cathodes
+                Not recommended
+        2 - Sort the anodes and cathodes by capacity
+                Suboptimal, not recommended
+        3 - Use the 2D cost matrix method
+                Optimal if N:P ratios are the same within batches
+        4 - Use greedy 3D matching
+                Suboptimal, only use if N:P ratios differ and exact 3D is too slow
+        5 - Use exact 3D matching
+                Optimal if N:P ratios differ within batches, but can be slow
+        6 - Choose automatically (default)
+                If N:P ratios do not change, use 2D matching, otherwise use exact 3D, if too slow use greedy 3D
 
 TODO:
     - Make rejection_cost_factor an argument when AutoSuite supports it.
@@ -42,6 +48,8 @@ from scipy.optimize import linear_sum_assignment
 import pulp
 
 DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
+
+TIMEOUT_SECONDS = 30
 
 
 def calculate_capacity(df):
@@ -124,7 +132,7 @@ def exact_npartite_matching(cost_matrix):
         problem += pulp.lpSum(x[a] for a in assignments if a[2] == i) == 1
 
     # Solve the problem
-    problem.solve(pulp.PULP_CBC_CMD(options=['sec=20']))
+    problem.solve(pulp.PULP_CBC_CMD(options=[f'sec={TIMEOUT_SECONDS}']))
     print(pulp.LpStatus[problem.status])
     if pulp.LpStatus[problem.status] != 'Optimal':
         raise ValueError(f'Optimal solution not found. Status: {pulp.LpStatus[problem.status]}')
@@ -291,7 +299,7 @@ def main():
     if len(sys.argv) >= 2:
         sorting_method = int(sys.argv[1])
     else:
-        sorting_method = 5
+        sorting_method = 6
 
     print(f'Reading from database {DATABASE_FILEPATH}, using sorting method {sorting_method}')
 
@@ -314,17 +322,17 @@ def main():
 
             # Reorder the anode and cathode rack positions based on the sorting method
             match sorting_method:
-                case 1: # Use cost matrix and linear sum assignment
-                    anode_ind, cathode_ind = cost_matrix_assign(df_batch)
+                case 1: # Do not sort
+                    anode_ind = np.arange(len(row_indices))
+                    cathode_ind = np.arange(len(row_indices))
 
-                case 2: # Sort by weight
+                case 2: # Order by capacity
                     # I think this is always worse than the cost matrix approach
                     anode_ind = np.argsort(df_batch["Anode Capacity (mAh)"])
                     cathode_ind = np.argsort(df_batch["Cathode Capacity (mAh)"])
 
-                case 3: # Do not sort
-                    anode_ind = np.arange(len(row_indices))
-                    cathode_ind = np.arange(len(row_indices))
+                case 3: # Use cost matrix and linear sum assignment
+                    anode_ind, cathode_ind = cost_matrix_assign(df_batch)
 
                 case 4: # Use greedy 3D matching
                     anode_ind, cathode_ind = cost_matrix_assign_3d(df_batch)
@@ -342,7 +350,7 @@ def main():
                         len(df_batch["Minimum N:P Ratio"].unique()) == 1 &
                         len(df_batch["Maximum N:P Ratio"].unique()) == 1):
                         anode_ind, cathode_ind = cost_matrix_assign(df_batch)
-                    # Otherwise, try exact matching for 10 seconds, otherwise give up and use greedy matching
+                    # Otherwise, try exact matching, if timeout use greedy matching
                     else:
                         try:
                             anode_ind, cathode_ind = cost_matrix_assign_3d(df_batch,exact=True)
