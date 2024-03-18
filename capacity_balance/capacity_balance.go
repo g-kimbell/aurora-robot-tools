@@ -4,14 +4,26 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 )
 
 func main() {
-	// When AutoSuite works correctly, we can pass in the arguements here. For now they have to be hardcoded.
-	cmd := exec.Command("py", append([]string{"capacity_balance.py"}, "1")...)
+	argsWithoutProg := os.Args[1:]
+
+	// Get the path to the directory of the current script
+	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Construct the path to the Python script
+	pyScriptPath := filepath.Join(dir, "capacity_balance.py")
+
+	// Run the Python script
+	cmd := exec.Command("py", append([]string{pyScriptPath}, argsWithoutProg...)...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	err := cmd.Run()
+	err = cmd.Run()
 
 	if err != nil {
 		log.Fatalf("cmd.Run() failed with %s\n", err)
