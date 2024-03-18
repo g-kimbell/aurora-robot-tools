@@ -27,22 +27,22 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
     df_electrolyte = pd.read_sql("SELECT * FROM Electrolyte_Table", conn)
 
     # number_of_electrolyte_positions is max of column "Electrolyte Position" in df_electrolyte
-    number_of_electrolyte_positions = df_electrolyte["Electrolyte Position"].max()
+    n = df_electrolyte["Electrolyte Position"].max()
 
     # Get a square matrix of the mixture fractions
-    mix_fractions = np.zeros((number_of_electrolyte_positions, number_of_electrolyte_positions))
-    for i in range(number_of_electrolyte_positions):
+    mix_fractions = np.zeros((n, n))
+    for i in range(n):
         mix_fractions[:, i] = df_electrolyte[f"Mix {i+1}"]
     mix_fractions = np.nan_to_num(mix_fractions)
-    for i in range(number_of_electrolyte_positions):
+    for i in range(n):
         if mix_fractions[i].sum() != 0:
             mix_fractions[i] = mix_fractions[i] / mix_fractions[i].sum()  # normalise the row
 
     # Get a vector for the (final) volumes required
     # Calculate the cumulative volumes required, i.e. the volume required including the amount which
     # will then be used to mix other electrolytes
-    volumes = np.zeros(number_of_electrolyte_positions)
-    for i in range(number_of_electrolyte_positions):
+    volumes = np.zeros(n)
+    for i in range(n):
         mask = ((df["Electrolyte Position"] == i + 1)
                 & (df["Cell Number"] > 0)
                 & (df["Error Code"] == 0))
@@ -70,8 +70,8 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
     source_positions = []
     target_positions = []
     volumes_to_mix = []
-    for i in range(number_of_electrolyte_positions):
-        for j in range(number_of_electrolyte_positions):
+    for j in range(n):
+        for i in range(n):
             if mixing_matrix[i, j] > 0:
                 source_positions.append(j + 1)
                 target_positions.append(i + 1)
