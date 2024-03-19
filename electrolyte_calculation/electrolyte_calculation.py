@@ -9,17 +9,21 @@ electrolytes for the cells.
 Usage:
     The script is called from electrolyte_calculation.exe by the AutoSuite software.
     It can also be called from the command line.
-
-TODO:
-    - Add an option to multiply all the volumes by a factor as an error margin and/or to account for
-      evaporation.
 """
 
 import sqlite3
+import sys
 import numpy as np
 import pandas as pd
 
 DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
+
+# Multiply all the volumes by safety_factor to account for evaporation and error
+if len(sys.argv) >= 2:
+    safety_factor = sys.argv[1]
+else:
+    safety_factor = 1.1
+print(f"Multiplying all electrolyte volumes by {safety_factor}.")
 
 with sqlite3.connect(DATABASE_FILEPATH) as conn:
     # Read the tables from the database
@@ -46,8 +50,8 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
         mask = ((df["Electrolyte Position"] == i + 1)
                 & (df["Cell Number"] > 0)
                 & (df["Error Code"] == 0))
-        volumes[i] = df.loc[mask, "Electrolyte Amount (uL)"].sum()
-    
+        volumes[i] = df.loc[mask, "Electrolyte Amount (uL)"].sum() * safety_factor
+
     cumulative_volumes = volumes
     remaining_volumes = volumes
     for i in range(5):
