@@ -14,9 +14,9 @@ Usage:
 import sys
 import os
 import sqlite3
+import warnings
 import numpy as np
 import pandas as pd
-import warnings
 
 # Ignore the pandas data validation warning
 warnings.filterwarnings('ignore', '.*extension is not supported and will be removed.*')
@@ -26,10 +26,9 @@ DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
 if len(sys.argv) >= 2:
     input_filepath = sys.argv[1]
 else:
-    input_filepath = os.path.join(
-        os.environ["USERPROFILE"],
-        "Desktop\\Inputs\\Input with electrode table.xlsx",
-        )
+    input_filepath = "%userprofile%\\Desktop\\Inputs\\Input with electrode table.xlsx"
+if input_filepath.lower().startswith("%userprofile%"):
+    input_filepath = os.path.expandvars(input_filepath)
 
 print(f'Input Excel file: {input_filepath}')
 print(f'Output database: {DATABASE_FILEPATH}')
@@ -91,12 +90,12 @@ print('Successfully read and manipulated the Excel file.')
 # Connect to the database and create the Cell_Assembly_Table
 with sqlite3.connect(DATABASE_FILEPATH) as conn:
     df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace",
-              dtype={"Anode Rack Position": "INTEGER", 
-                     "Cathode Rack Position": "INTEGER", 
-                     "Cell Number": "INTEGER", 
-                     "Last Completed Step": "INTEGER", 
-                     "Current Press Number": "INTEGER", 
-                     "Error Code": "INTEGER", 
+              dtype={"Anode Rack Position": "INTEGER",
+                     "Cathode Rack Position": "INTEGER",
+                     "Cell Number": "INTEGER",
+                     "Last Completed Step": "INTEGER",
+                     "Current Press Number": "INTEGER",
+                     "Error Code": "INTEGER",
                      "Casing Type": "TEXT",
                      "Barcode": "TEXT",
               }
@@ -109,4 +108,4 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
     df_electrolyte.to_sql("Electrolyte_Table", conn, index=False, if_exists="replace",
                           dtype=electrolyte_dtype)
 
-print('Connected to the database and updated Cell_Assembly_Table, Press_Table, and Electrolyte_Table.')
+print('Successfully updated the database.')
