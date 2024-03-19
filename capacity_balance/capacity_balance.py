@@ -61,9 +61,9 @@ def calculate_capacity(df):
     Args:
         df (pandas.DataFrame): The dataframe containing the cell assembly data.
     """
-    df["Anode Capacity (mAh)"] = ((df["Anode Weight (mg)"] - df["Anode Current Collector Weight (mg)"])
+    df["Anode Capacity (mAh)"] = (1e-3 * (df["Anode Weight (mg)"] - df["Anode Current Collector Weight (mg)"])
         * df["Anode Active Material Weight Fraction"] * df["Anode Practical Capacity (mAh/g)"])
-    df["Cathode Capacity (mAh)"] = ((df["Cathode Weight (mg)"] - df["Cathode Current Collector Weight (mg)"])
+    df["Cathode Capacity (mAh)"] = (1e-3 * (df["Cathode Weight (mg)"] - df["Cathode Current Collector Weight (mg)"])
         * df["Cathode Active Material Weight Fraction"] * df["Cathode Practical Capacity (mAh/g)"])
 
 
@@ -135,11 +135,12 @@ def exact_npartite_matching(cost_matrix):
         problem += pulp.lpSum(x[a] for a in assignments if a[2] == i) == 1
 
     # Solve the problem
+    print(f'Attempting exact matching, will give up if a solution not found in {TIMEOUT_SECONDS} seconds...')
     problem.solve(pulp.PULP_CBC_CMD(options=[f'sec={TIMEOUT_SECONDS}'],msg=False))
-    print(pulp.LpStatus[problem.status])
     if pulp.LpStatus[problem.status] != 'Optimal':
         raise ValueError(f'Optimal solution not found. Status: {pulp.LpStatus[problem.status]}')
-
+    else:
+        print('Optimal solution found')
     # Get the optimal assignments
     optimal_assignments = np.array([a for a in assignments if pulp.value(x[a]) == 1])
     i_idx, j_idx, k_idx = optimal_assignments[:,0], optimal_assignments[:,1], optimal_assignments[:,2]
@@ -285,9 +286,9 @@ def update_cell_numbers(df):
                             & (df["Actual N:P Ratio"] <= df["Maximum N:P Ratio"]))
     accepted_cell_indices = np.where(cell_meets_criteria)[0]
     rejected_cell_indices = np.where(~cell_meets_criteria & ~df["Actual N:P Ratio"].isnull())[0]
-    average_deviation = np.mean(np.abs(df["Actual N:P Ratio"][accepted_cell_indices] 
+    average_deviation = np.mean(np.abs(df["Actual N:P Ratio"][accepted_cell_indices]
                                        - df["Target N:P Ratio"][accepted_cell_indices]))
-    print(f'Accepted {len(accepted_cell_indices)} cells'
+    print(f'Accepted {len(accepted_cell_indices)} cells '
           f'with average N:P deviation from target: {average_deviation:.4f}\n'
           f'Rejected {len(rejected_cell_indices)} cells.')
 
