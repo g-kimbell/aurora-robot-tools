@@ -10,32 +10,38 @@ Usage:
     The script is called from assign_cells_to_press.exe by the AutoSuite software.
     It can also be called from the command line.
 
-    There are two additional parameters that can set:
+    There are two optional parameters that can set with the command line call.
 
-    - `link_rack_pos_to_press`:
+    - `link_rack_pos_to_press` (bool, default False):
         If set, press 1 will only accept cells from rack positions 1, 7, 13, 19, 25, 31. Press 2
         only accepts cells from rack positions 2, 8, 14, 20, 26, 32, and so on.
 
-    - `limit_electrolytes_per_batch`:
+    - `limit_electrolytes_per_batch` (int, default 0):
         0 - No limit on the number of different electrolytes in a batch of up to 6 cells.
         n (integer) - Limit the number of different electrolytes in a batch of up to 6 cells to n.
             This is useful if the electrolyte is volatile, since the cleaning step between each 
             electrolyte switch is time-consuming.
 
-TODO:
-    - Make `link_rack_pos_to_press` and `limit_electrolytes_per_batch` arguments when AutoSuite
-      supports it.
+    e.g. `py assign_cells_to_press.py 1 2`
+    This will ensure that rack positions and press positions are linked (rack 1 only goes to press 
+    1, rack 2 to press 2, etc.) and limit the number of different electrolytes in each batch to 2.
 """
 
 import sqlite3
+import sys
 import numpy as np
 import pandas as pd
 
 DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
 
-# TODO make these arguments when AutoSuite supports it
-link_rack_pos_to_press = False
-limit_electrolytes_per_batch = 0
+if len(sys.argv) >= 2:
+    link_rack_pos_to_press = bool(sys.argv[1])
+else:
+    link_rack_pos_to_press = True
+if len(sys.argv) >= 3:
+    limit_electrolytes_per_batch = int(sys.argv[2])
+else:
+    limit_electrolytes_per_batch = 0
 
 with sqlite3.connect(DATABASE_FILEPATH) as conn:
     # Read the table Cell_Assembly_Table and Press_Table from the database
