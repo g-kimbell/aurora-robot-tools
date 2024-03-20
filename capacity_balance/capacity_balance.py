@@ -62,9 +62,9 @@ def calculate_capacity(df):
         df (pandas.DataFrame): The dataframe containing the cell assembly data.
     """
     df["Anode Capacity (mAh)"] = (1e-3 * (df["Anode Weight (mg)"] - df["Anode Current Collector Weight (mg)"])
-        * df["Anode Active Material Weight Fraction"] * df["Anode Practical Capacity (mAh/g)"])
+        * df["Anode Active Material Weight Fraction"] * df["Anode Nominal Specific Capacity (mAh/g)"])
     df["Cathode Capacity (mAh)"] = (1e-3 * (df["Cathode Weight (mg)"] - df["Cathode Current Collector Weight (mg)"])
-        * df["Cathode Active Material Weight Fraction"] * df["Cathode Practical Capacity (mAh/g)"])
+        * df["Cathode Active Material Weight Fraction"] * df["Cathode Nominal Specific Capacity (mAh/g)"])
 
 
 def cost_matrix_assign(df, rejection_cost_factor = 2):
@@ -248,26 +248,8 @@ def rearrange_electrode_columns(df, row_indices, anode_ind, cathode_ind):
         anode_ind (numpy.ndarray): Anode indices for optimal matching (length = len(row_indices)).
         cathode_ind (numpy.ndarray): Cathode indices for optimal matching (length = len(row_indices)).
     """
-    anode_columns = [
-                "Anode Rack Position",
-                "Anode Type",
-                "Anode Weight (mg)",
-                "Anode Capacity (mAh)",
-                "Anode Diameter (mm)",
-                "Anode Current Collector Weight (mg)",
-                "Anode Active Material Weight Fraction",
-                "Anode Practical Capacity (mAh/g)",
-            ]
-    cathode_columns = [
-                "Cathode Rack Position",
-                "Cathode Type",
-                "Cathode Weight (mg)",
-                "Cathode Capacity (mAh)",
-                "Cathode Diameter (mm)",
-                "Cathode Current Collector Weight (mg)",
-                "Cathode Active Material Weight Fraction",
-                "Cathode Practical Capacity (mAh/g)",
-            ]
+    anode_columns = [col for col in df.columns if 'Anode' in col]
+    cathode_columns = [col for col in df.columns if 'Cathode' in col]
     df_immutable = df.copy()
     for column in anode_columns:
         df.loc[row_indices, column] = df_immutable.loc[row_indices[anode_ind], column].values

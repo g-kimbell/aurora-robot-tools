@@ -46,18 +46,8 @@ df_press["Error Code"] = 0
 df_press["Last Completed Step"] = 0
 
 # Fill the details for electrode properties
-anode_columns = [
-    "Anode Diameter (mm)",
-    "Anode Current Collector Weight (mg)",
-    "Anode Active Material Weight Fraction",
-    "Anode Practical Capacity (mAh/g)",
-    ]
-cathode_columns = [
-    "Cathode Diameter (mm)",
-    "Cathode Current Collector Weight (mg)",
-    "Cathode Active Material Weight Fraction",
-    "Cathode Practical Capacity (mAh/g)",
-    ]
+anode_columns = [col for col in df.columns if "Anode" in col and col != "Anode Type"]
+cathode_columns = [col for col in df.columns if "Cathode" in col and col != "Cathode Type"]
 for column in anode_columns:
     df[column] = df["Anode Type"].map(df_electrodes.set_index("Anode Type")[column])
 for column in cathode_columns:
