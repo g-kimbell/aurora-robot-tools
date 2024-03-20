@@ -36,17 +36,14 @@ print(f'Output database: {DATABASE_FILEPATH}')
 # Read the excel file
 df = pd.read_excel(input_filepath, sheet_name="Input Table")
 df_electrodes = pd.read_excel(input_filepath, sheet_name="Electrode Properties")
-df_press = pd.read_excel(input_filepath, sheet_name="Press Properties")
 df_electrolyte = pd.read_excel(input_filepath, sheet_name="Electrolyte Properties", skiprows=1)
 
-# Add a column of NULL for the "Cell Number"
-df["Cell Number"] = None
-n = 1
-for i in range(36):
-    # check if the row has more than 5 elements that are not null, if so increment the cell number
-    if df.iloc[i].count() > 5:
-        df.loc[i, "Cell Number"] = n
-        n += 1
+# Create the empty Press_Table
+df_press = pd.DataFrame()
+df_press["Press Number"] = [1, 2, 3, 4, 5, 6]
+df_press["Current Cell Number Loaded"] = 0
+df_press["Error Code"] = 0
+df_press["Last Completed Step"] = 0
 
 # Fill the details for electrode properties
 anode_columns = [
@@ -66,7 +63,7 @@ for column in anode_columns:
 for column in cathode_columns:
     df[column] = df["Cathode Type"].map(df_electrodes.set_index("Cathode Type")[column])
 
-# Add columns for the anode and cathode weights and capacity
+# Add columns which will be filled in later
 df["Anode Weight (mg)"] = np.nan
 df["Anode Capacity (mAh)"] = np.nan
 df["Anode Rack Position"] = np.nan
@@ -74,6 +71,7 @@ df["Cathode Weight (mg)"] = np.nan
 df["Cathode Capacity (mAh)"] = np.nan
 df["Cathode Rack Position"] = np.nan
 df["Actual N:P Ratio"] = np.nan
+df["Cell Number"] = 0
 df["Last Completed Step"] = 0
 df["Current Press Number"] = 0
 df["Error Code"] = 0
