@@ -126,7 +126,7 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
             if limit_electrolytes_per_batch:
                 electrolytes_used.append(loaded_cell)
             df_press.loc[press_idx, "Current Cell Number Loaded"] = loaded_cell
-            df.loc[loaded_cell-1, "Current Press Number"] = press_idx+1
+            df.loc[df["Cell Number"]==loaded_cell, "Current Press Number"] = press_idx+1
             print(f'Setting Current Press Number to {press_idx+1} for cell {loaded_cell}')
 
             # Remove the loaded cell from the available cells
