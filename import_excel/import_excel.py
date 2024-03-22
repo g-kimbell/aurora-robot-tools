@@ -26,7 +26,7 @@ DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
 if len(sys.argv) >= 2:
     input_filepath = sys.argv[1]
 else:
-    input_filepath = "%userprofile%\\Desktop\\Inputs\\Input with electrode table.xlsx"
+    input_filepath = "%userprofile%\\Desktop\\Inputs\\Input.xlsx"
 if input_filepath.lower().startswith("%userprofile%"):
     input_filepath = os.path.expandvars(input_filepath)
 
@@ -46,8 +46,8 @@ df_press["Error Code"] = 0
 df_press["Last Completed Step"] = 0
 
 # Fill the details for electrode properties
-anode_columns = [col for col in df.columns if "Anode" in col and col != "Anode Type"]
-cathode_columns = [col for col in df.columns if "Cathode" in col and col != "Cathode Type"]
+anode_columns = [col for col in df_electrodes.columns if "Anode" in col and col != "Anode Type"]
+cathode_columns = [col for col in df_electrodes.columns if "Cathode" in col and col != "Cathode Type"]
 for column in anode_columns:
     df[column] = df["Anode Type"].map(df_electrodes.set_index("Anode Type")[column])
 for column in cathode_columns:
