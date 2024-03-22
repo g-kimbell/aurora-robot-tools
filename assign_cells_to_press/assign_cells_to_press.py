@@ -51,7 +51,7 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
     # Check where the cell number loaded is 0 and where the error code is 0 for the presses
     available_press_numbers = np.where((df_press["Current Cell Number Loaded"] == 0)
                                         & (df_press["Error Code"] == 0))[0]+1
-  
+
     # Find rack positions with cells that are assigned for assembly (Cell Number > 0), have not
     # started assembly, with no error code, and find their cell numbers and electrolyte positions
     available_rack_pos = np.where((df["Cell Number"]>0)
@@ -94,14 +94,14 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
                 else:
                     print(f'Press {press_idx+1} has an error')
                 df.loc[available_rack_pos[error_mask]-1, "Error Code"] = 301
-           
+
             # Otherwise if a cell is already loaded, ensure the press number is set for that cell
             elif df_press.loc[press_idx, "Current Cell Number Loaded"] != 0:
                 print(f'Press {press_idx+1} already has cell '
                         f'{df_press.loc[press_idx, "Current Cell Number Loaded"]} loaded')
                 mask = df["Cell Number"]==df_press.loc[press_idx, "Current Cell Number Loaded"]
                 df.loc[mask, "Current Press Number"] = press_idx+1
-              
+
                 # If there is no error, add the electrolyte to the list of used electrolytes
                 if df_press.loc[press_idx, "Error Code"] == 0:
                     electrolyte = df.loc[mask, "Electrolyte Position"].values[0]
@@ -119,8 +119,8 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
 
         # Assign the first available cell to the press
         final_available_cell_numbers = available_cell_numbers[availability_mask]
-        loaded_cell=final_available_cell_numbers[0]
         if final_available_cell_numbers.size > 0:
+            loaded_cell=final_available_cell_numbers[0]
             print(f'For press {press_idx+1} I can load cells {final_available_cell_numbers}, '
                     f'loading cell number {loaded_cell}')
             if limit_electrolytes_per_batch:
