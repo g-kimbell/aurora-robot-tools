@@ -275,7 +275,7 @@ def update_cell_numbers(df):
           f'Rejected {len(rejected_cell_indices)} cells.')
 
     # Re-write the Cell Number column to only include cells with both anode and cathode
-    df["Cell Number"] = None
+    df["Cell Number"] = 0
     for cell_number, cell_index in enumerate(accepted_cell_indices):
         df.loc[cell_index, "Cell Number"] = cell_number + 1
 
