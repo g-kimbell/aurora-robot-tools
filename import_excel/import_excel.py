@@ -15,7 +15,6 @@ import sys
 import os
 import sqlite3
 import warnings
-import numpy as np
 import pandas as pd
 
 # Ignore the pandas data validation warning
@@ -34,7 +33,7 @@ print(f'Input Excel file: {input_filepath}')
 print(f'Output database: {DATABASE_FILEPATH}')
 
 # Read the excel file
-df = pd.read_excel(input_filepath, sheet_name="Input Table")
+df = pd.read_excel(input_filepath, sheet_name="Input Table", dtype={"Casing Type": str})
 df_electrodes = pd.read_excel(input_filepath, sheet_name="Electrode Properties")
 df_electrolyte = pd.read_excel(input_filepath, sheet_name="Electrolyte Properties", skiprows=1)
 
@@ -53,14 +52,15 @@ for column in anode_columns:
 for column in cathode_columns:
     df[column] = df["Cathode Type"].map(df_electrodes.set_index("Cathode Type")[column])
 
+
 # Add columns which will be filled in later
-df["Anode Weight (mg)"] = np.nan
-df["Anode Capacity (mAh)"] = np.nan
-df["Anode Rack Position"] = np.nan
-df["Cathode Weight (mg)"] = np.nan
-df["Cathode Capacity (mAh)"] = np.nan
-df["Cathode Rack Position"] = np.nan
-df["Actual N:P Ratio"] = np.nan
+df["Anode Weight (mg)"] = 0
+df["Anode Capacity (mAh)"] = 0
+df["Anode Rack Position"] = 0
+df["Cathode Weight (mg)"] = 0
+df["Cathode Capacity (mAh)"] = 0
+df["Cathode Rack Position"] = 0
+df["Actual N:P Ratio"] = 0
 df["Cell Number"] = 0
 df["Last Completed Step"] = 0
 df["Current Press Number"] = 0
@@ -86,6 +86,7 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
                      "Error Code": "INTEGER",
                      "Casing Type": "TEXT",
                      "Barcode": "TEXT",
+                     "Batch Number": "INTEGER",
               }
     )
     df_press.to_sql("Press_Table", conn, index=False, if_exists="replace",
