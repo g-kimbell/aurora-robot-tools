@@ -43,6 +43,8 @@ if len(sys.argv) >= 3:
 else:
     limit_electrolytes_per_batch = 0
 
+RACK_TO_PRESS_ORDER = [1,4,2,5,3,6] # which rack positions should be used for presses 1-6
+
 with sqlite3.connect(DATABASE_FILEPATH) as conn:
     # Read the table Cell_Assembly_Table and Press_Table from the database
     df = pd.read_sql("SELECT * FROM Cell_Assembly_Table", conn)
@@ -53,9 +55,9 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
                                         & (df_press["Error Code"] == 0))[0]+1
 
     # Find rack positions with cells that are assigned for assembly (Cell Number > 0), have not
-    # started assembly, with no error code, and find their cell numbers and electrolyte positions
+    # finished assembly, with no error code, and find their cell numbers and electrolyte positions
     available_rack_pos = np.where((df["Cell Number"]>0)
-                                    & (df["Last Completed Step"]==0)
+                                    & (df["Last Completed Step"]<11)
                                     & (df["Error Code"]==0))[0]+1
     available_cell_numbers = df.loc[available_rack_pos-1, "Cell Number"].values.astype(int)
     available_electrolytes = df.loc[available_rack_pos-1, "Electrolyte Position"].values.astype(int)
@@ -87,7 +89,7 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
             # If using link_rack_pos_to_press and press has an error code,
             # add an error code to all rack positions linked to that press
             if link_rack_pos_to_press & (df_press.loc[press_idx, "Error Code"] != 0):
-                error_mask = available_rack_pos%6 == (press_idx+1)%6
+                error_mask = (available_rack_pos-1)%6+1 == RACK_TO_PRESS_ORDER[press_idx]
                 if available_cell_numbers[error_mask].size>0:
                     print(f'Press {press_idx+1} has an error, '
                             f'giving error code to cells with rack position {available_cell_numbers[error_mask]}')
@@ -110,7 +112,7 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
 
         # If using link_rack_pos_to_press, only consider cells in when rack_position%6 == (press_idx+1)%6
         if link_rack_pos_to_press:
-            availability_mask = available_rack_pos%6 == (press_idx+1)%6
+            availability_mask = (available_rack_pos-1)%6+1 == RACK_TO_PRESS_ORDER[press_idx]
 
         # Only allow limit_electrolytes_per_batch different electrolytes to be loaded at once (if > 0)
         if limit_electrolytes_per_batch:
