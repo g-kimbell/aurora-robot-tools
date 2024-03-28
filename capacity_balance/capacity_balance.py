@@ -257,22 +257,27 @@ def rearrange_electrode_columns(df, row_indices, anode_ind, cathode_ind):
         df.loc[row_indices, column] = df_immutable.loc[row_indices[cathode_ind], column].values
 
 
-def update_cell_numbers(df):
+def update_cell_numbers(df, check_NP_ratio=True):
     """Update the cell numbers in the main dataframe, df, based on the accepted cells.
     
     Args:
         df (pandas.DataFrame): The dataframe containing the cell assembly data.
     """
-    df["Actual N:P Ratio"] = df["Anode Capacity (mAh)"] / df["Cathode Capacity (mAh)"]
-    cell_meets_criteria = ((df["Actual N:P Ratio"] >= df["Minimum N:P Ratio"])
-                            & (df["Actual N:P Ratio"] <= df["Maximum N:P Ratio"]))
-    accepted_cell_indices = np.where(cell_meets_criteria)[0]
-    rejected_cell_indices = np.where(~cell_meets_criteria & ~df["Actual N:P Ratio"].isnull())[0]
-    average_deviation = np.mean(np.abs(df["Actual N:P Ratio"][accepted_cell_indices]
-                                       - df["Target N:P Ratio"][accepted_cell_indices]))
-    print(f'Accepted {len(accepted_cell_indices)} cells '
-          f'with average N:P deviation from target: {average_deviation:.4f}\n'
-          f'Rejected {len(rejected_cell_indices)} cells.')
+    if check_NP_ratio:
+        df["Actual N:P Ratio"] = df["Anode Capacity (mAh)"] / df["Cathode Capacity (mAh)"]
+        cell_meets_criteria = ((df["Actual N:P Ratio"] >= df["Minimum N:P Ratio"])
+                                & (df["Actual N:P Ratio"] <= df["Maximum N:P Ratio"]))
+        accepted_cell_indices = np.where(cell_meets_criteria)[0]
+        rejected_cell_indices = np.where(~cell_meets_criteria & ~df["Actual N:P Ratio"].isnull())[0]
+        average_deviation = np.mean(np.abs(df["Actual N:P Ratio"][accepted_cell_indices]
+                                        - df["Target N:P Ratio"][accepted_cell_indices]))
+        print(f'Accepted {len(accepted_cell_indices)} cells '
+            f'with average N:P deviation from target: {average_deviation:.4f}\n'
+            f'Rejected {len(rejected_cell_indices)} cells.')
+    else:
+        # accept any cell with an anode and cathode
+        accepted_cell_indices = np.where(~df["Anode Capacity (mAh)"].isnull() & ~df["Cathode Capacity (mAh)"].isnull())[0]
+        print(f'Accepted {len(accepted_cell_indices)} cells without checking N:P ratio.')
 
     # Re-write the Cell Number column to only include cells with both anode and cathode
     df["Cell Number"] = 0
@@ -291,6 +296,7 @@ def main():
         sorting_method = 6
 
     sorting_methods = {
+        0: "Do not sort, do not check N:P ratio",
         1: "Do not sort",
         2: "Sort by capacity",
         3: "2D cost matrix",
@@ -321,6 +327,10 @@ def main():
 
             # Reorder the anode and cathode rack positions based on the sorting method
             match sorting_method:
+                case 0: # Do not sort, do not check N:P ratio
+                    anode_ind = np.arange(len(row_indices))
+                    cathode_ind = np.arange(len(row_indices))
+
                 case 1: # Do not sort
                     anode_ind = np.arange(len(row_indices))
                     cathode_ind = np.arange(len(row_indices))
@@ -361,7 +371,10 @@ def main():
             rearrange_electrode_columns(df, row_indices, anode_ind, cathode_ind)
 
         # Update the actual N:P ratio and accepted cell numbers in the main dataframe
-        update_cell_numbers(df)
+        if sorting_method == 0:
+            update_cell_numbers(df, check_NP_ratio=False)
+        else:
+            update_cell_numbers(df)
 
         # Write the updated table back to the database
         df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace")
