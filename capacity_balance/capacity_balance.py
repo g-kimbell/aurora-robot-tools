@@ -22,6 +22,9 @@ Usage:
     There is one additional parameter that can be set:
 
     - `sorting_method`:
+        0 - Do not sort, do not check N:P ratio
+                Use if you want to keep the anodes and cathodes in the same order as they are
+                e.g. when restarting the program part-way through a run
         1 - Do not sort the anodes and cathodes
                 Not recommended
         2 - Sort the anodes and cathodes by capacity
