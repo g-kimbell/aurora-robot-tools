@@ -56,17 +56,14 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
 
     # Find rack positions with cells that are assigned for assembly (Cell Number > 0), have not
     # finished assembly, with no error code, and find their cell numbers and electrolyte positions
-    available_rack_pos = np.where((df["Cell Number"]>0)
-                                    & (df["Last Completed Step"]<11)
-                                    & (df["Error Code"]==0))[0]+1
+    available_rack_pos = np.where(
+        df["Cell Number"]>0 &
+        df["Last Completed Step"]<11 &
+        df["Error Code"]==0 &
+        df["Current Press Number"]==0
+        )[0]+1
     available_cell_numbers = df.loc[available_rack_pos-1, "Cell Number"].values.astype(int)
     available_electrolytes = df.loc[available_rack_pos-1, "Electrolyte Position"].values.astype(int)
-
-    # Remove cells that are already loaded into a press
-    idx_to_keep = np.isin(available_cell_numbers, df_press["Current Cell Number Loaded"].values, invert=True)
-    available_cell_numbers = available_cell_numbers[idx_to_keep]
-    available_rack_pos = available_rack_pos[idx_to_keep]
-    available_electrolytes = available_electrolytes[idx_to_keep]
 
     if link_rack_pos_to_press:
         print('Using link_rack_pos_to_press')
