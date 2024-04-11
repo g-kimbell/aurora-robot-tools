@@ -332,9 +332,9 @@ def main():
 
         for batch_number in batch_numbers:
             batch_mask = (
-                df["Batch Number"] == batch_number &
-                df["Last Completed Step"] == 0 &
-                df["Error Code"] == 0
+                (df["Batch Number"] == batch_number) &
+                (df["Last Completed Step"] == 0) &
+                (df["Error Code"] == 0)
             )
             df_batch = df[batch_mask]
             row_indices = np.where(batch_mask)[0]
