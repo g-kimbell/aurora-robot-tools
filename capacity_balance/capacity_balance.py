@@ -64,10 +64,14 @@ def calculate_capacity(df):
     Args:
         df (pandas.DataFrame): The dataframe containing the cell assembly data.
     """
-    df["Anode Capacity (mAh)"] = (1e-3 * (df["Anode Weight (mg)"] - df["Anode Current Collector Weight (mg)"])
-        * df["Anode Active Material Weight Fraction"] * df["Anode Nominal Specific Capacity (mAh/g)"])
-    df["Cathode Capacity (mAh)"] = (1e-3 * (df["Cathode Weight (mg)"] - df["Cathode Current Collector Weight (mg)"])
-        * df["Cathode Active Material Weight Fraction"] * df["Cathode Nominal Specific Capacity (mAh/g)"])
+    for xode in ["Anode", "Cathode"]:
+        df[f"{xode} Active Material Weight (mg)"] = (
+            (df[f"{xode} Weight (mg)"] - df[f"{xode} Current Collector Weight (mg)"])
+            * df[f"{xode} Active Material Weight Fraction"]
+        )
+        df[f"{xode} Capacity (mAh)"] = (
+            1e-3 * df[f"{xode} Active Material Weight (mg)"] * df[f"{xode} Nominal Specific Capacity (mAh/g)"]
+        )
 
 
 def cost_matrix_assign(df, rejection_cost_factor = 2):
