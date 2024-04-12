@@ -34,7 +34,6 @@ if not input_filepath:
 
 if input_filepath:
     print(f'Input Excel file: {input_filepath}')
-    print(f'Output database: {DATABASE_FILEPATH}')
 
     # Read the excel file
     df = pd.read_excel(input_filepath, sheet_name="Input Table", dtype={"Casing Type": str})
@@ -78,6 +77,23 @@ if input_filepath:
 
     print('Successfully read and manipulated the Excel file.')
 
+    # Warnings to the user
+    exit_code=0
+    used_rows = df["Anode Type"].notnull() | df["Cathode Type"].notnull()
+    if (df["Electrolyte Amount (uL)"]>500).any():
+        print(f'CRITICAL: your input has electrolyte volumes ({max(df["Electrolyte Amount (uL)"])} uL) that are too large.')
+    elif (df["Electrolyte Amount (uL)"]>150).any():
+        print(f'WARNING: your input has large electrolyte volumes up {max(df["Electrolyte Amount (uL)"])} uL.')
+    if (~df["Separator"].loc[used_rows].isin(["Whatman","Celgard"])).any():
+        print('WARNING: separator type not recognised. Check the input file.')
+    if (df["Rack Position"] != pd.Series(range(1, 37))).any():
+        exit_code=1
+        print('CRITICAL: rack positions must be sequential 1-36. Check the input file.')
+
+    if exit_code:
+        print('Critical problems: did not update database.')
+        exit(1)
+
     # Connect to the database and create the Cell_Assembly_Table
     with sqlite3.connect(DATABASE_FILEPATH) as conn:
         df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace",
@@ -100,20 +116,4 @@ if input_filepath:
         df_electrolyte.to_sql("Electrolyte_Table", conn, index=False, if_exists="replace",
                             dtype=electrolyte_dtype)
 
-    print('Successfully updated the database.')
-
-    # Warnings to the user
-    exit_code=0
-    used_rows = df["Anode Type"].notnull() | df["Cathode Type"].notnull()
-    if (df["Electrolyte Amount (uL)"]>500).any():
-        print(f'CRITICAL: your input has electrolyte volumes ({max(df["Electrolyte Amount (uL)"])} uL) that are too large.')
-    elif (df["Electrolyte Amount (uL)"]>150).any():
-        print(f'WARNING: your input has large electrolyte volumes up {max(df["Electrolyte Amount (uL)"])} uL.')
-    if (~df["Separator"].loc[used_rows].isin(["Whatman","Celgard"])).any():
-        print('WARNING: separator type not recognised. Check the input file.')
-    if (df["Rack Position"] != pd.Series(range(1, 37))).any():
-        exit_code=1
-        print('CRITICAL: rack positions must be sequential 1-36. Check the input file.')
-    
-    if exit_code:
-        exit(1)
+    print(f'Successfully updated the database: {DATABASE_FILEPATH}')
