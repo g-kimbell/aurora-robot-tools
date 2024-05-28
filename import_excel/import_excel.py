@@ -11,6 +11,7 @@ Usage:
     It can also be called from the command line.
 """
 
+import os
 import sqlite3
 import warnings
 from tkinter import Tk, filedialog
@@ -29,11 +30,13 @@ input_filepath = filedialog.askopenfilename(
     filetypes = [("Excel files", "*.xlsx")]
 )
 
+exit_code=0
+
 if not input_filepath:
     print('No input file selected - not updating the database.')
 
 if input_filepath:
-    print(f'Input Excel file: {input_filepath}')
+    print(f'Reading {input_filepath}')
 
     # Read the excel file
     df = pd.read_excel(input_filepath, sheet_name="Input Table", dtype={"Casing Type": str})
@@ -47,6 +50,29 @@ if input_filepath:
     df_press["Error Code"] = 0
     df_press["Last Completed Step"] = 0
 
+    # Create the settings table
+    df_settings = pd.DataFrame()
+    filename_without_ext, _ = os.path.splitext(os.path.basename(input_filepath))
+    df_settings["key"] = ["Input Filepath","Base Sample ID"]
+    df_settings["value"] = [input_filepath,filename_without_ext]
+
+    # Create the timestamp table
+    df_timestamp = pd.DataFrame(columns = ["Cell Number","Step Number","Timestamp"])
+
+    # Fill the details for electrolyte properties
+    df["Electrolyte Name"] = df["Electrolyte Position"].map(
+        df_electrolyte.set_index("Electrolyte Position")["Name"]
+        )
+    df["Electrolyte Description"] = df["Electrolyte Position"].map(
+        df_electrolyte.set_index("Electrolyte Position")["Description"]
+        )
+    df["Electrolyte Amount Before Seperator (uL)"] = df["Electrolyte Amount (uL)"] * (
+        (df["Electrolyte Dispense Order"]=="Before") + 0.5*(df["Electrolyte Dispense Order"]=="Both")
+        )
+    df["Electrolyte Amount After Seperator (uL)"] = df["Electrolyte Amount (uL)"] * (
+        (df["Electrolyte Dispense Order"]=="After") + 0.5*(df["Electrolyte Dispense Order"]=="Both")
+        )
+
     # Fill the details for electrode properties
     anode_columns = [col for col in df_electrodes.columns if "Anode" in col and col != "Anode Type"]
     cathode_columns = [col for col in df_electrodes.columns if "Cathode" in col and col != "Cathode Type"]
@@ -57,17 +83,21 @@ if input_filepath:
 
     # Add columns which will be filled in later
     df["Anode Weight (mg)"] = 0
+    df["Anode Active Material Weight (mg)"] = 0
     df["Anode Capacity (mAh)"] = 0
     df["Anode Rack Position"] = 0
     df["Cathode Weight (mg)"] = 0
+    df["Cathode Active Material Weight (mg)"] = 0
     df["Cathode Capacity (mAh)"] = 0
     df["Cathode Rack Position"] = 0
+    df["N:P ratio overlap factor"] = df["Cathode Diameter (mm)"]**2 / df["Anode Diameter (mm)"]**2
     df["Actual N:P Ratio"] = 0
     df["Cell Number"] = 0
     df["Last Completed Step"] = 0
     df["Current Press Number"] = 0
     df["Error Code"] = 0
     df["Barcode"] = ""
+    df["Sample ID"] = ""
 
     # First filling of anode and cathode positions
     df.loc[df["Anode Type"].notnull(), "Anode Rack Position"] = df["Rack Position"]
@@ -78,9 +108,30 @@ if input_filepath:
     print('Successfully read and manipulated the Excel file.')
 
     # Warnings to the user
-    exit_code=0
+    columns_to_check = [
+        'Anode Type',
+        'Cathode Type',
+        'Target N:P Ratio',
+        'Minimum N:P Ratio',
+        'Maximum N:P Ratio',
+        'Separator',
+        'Electrolyte Position',
+        'Electrolyte Amount (uL)',
+        'Electrolyte Dispense Order',
+        'Batch Number',
+    ]
+    missing_columns = set(columns_to_check) - set(df.columns)
+    if missing_columns:
+        exit_code=1
+        print("CRITICAL: these columns are missing from the input:", missing_columns)
+
     used_rows = df["Anode Type"].notnull() | df["Cathode Type"].notnull()
+
+    if (~df["Electrolyte Dispense Order"].loc[used_rows].isin(["Before", "After", "Both"])).any():
+        exit_code=1
+        print('CRITICAL: electrolyte dispense order must be "Before", "After" or "Both".')
     if (df["Electrolyte Amount (uL)"]>500).any():
+        exit_code=1
         print(f'CRITICAL: your input has electrolyte volumes ({max(df["Electrolyte Amount (uL)"])} uL) that are too large.')
     elif (df["Electrolyte Amount (uL)"]>150).any():
         print(f'WARNING: your input has large electrolyte volumes up {max(df["Electrolyte Amount (uL)"])} uL.')
@@ -112,8 +163,13 @@ if input_filepath:
                         dtype={col: "INTEGER" for col in df_press.columns})
         electrolyte_dtype={col: "REAL" for col in df_electrolyte.columns}
         electrolyte_dtype["Electrolyte Position"] = "INTEGER"
-        electrolyte_dtype["Electrolyte Name"] = "TEXT"
+        electrolyte_dtype["Name"] = "TEXT"
+        electrolyte_dtype["Description"] = "TEXT"
         df_electrolyte.to_sql("Electrolyte_Table", conn, index=False, if_exists="replace",
                             dtype=electrolyte_dtype)
+        df_settings.to_sql("Settings_Table", conn, index=False, if_exists="replace",
+                           dtype={"key": "TEXT", "value": "TEXT"})
+        df_timestamp.to_sql("Timestamp_Table", conn, index=False, if_exists="replace",
+                            dtype={"Cell Number": "INTEGER", "Step Number": "INTEGER", "Timestamp": "VARCHAR(255)"})
 
-    print(f'Successfully updated the database: {DATABASE_FILEPATH}')
+    print(f'Successfully updated the database.')
