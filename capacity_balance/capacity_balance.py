@@ -72,6 +72,9 @@ def calculate_capacity(df):
         df[f"{xode} Capacity (mAh)"] = (
             1e-3 * df[f"{xode} Active Material Weight (mg)"] * df[f"{xode} Nominal Specific Capacity (mAh/g)"]
         )
+    # HACK not using actual diameters, since this doesn't work if electrode numbers are unequal
+    # The robot can only use 15 mm and 14 mm electrodes anyway
+    df["N:P ratio overlap factor"] = 14**2 / 15**2
 
 
 def cost_matrix_assign(df, rejection_cost_factor = 2):
@@ -88,7 +91,7 @@ def cost_matrix_assign(df, rejection_cost_factor = 2):
         tuple: The indices of the optimal matching of anodes and cathodes.
     """
     # Calculate all possible N:P ratios
-    actual_ratio = np.outer(df["Anode Capacity (mAh)"], 1 / df["Cathode Capacity (mAh)"])
+    actual_ratio = np.outer(df["N:P ratio overlap factor"] * df["Anode Capacity (mAh)"], 1 / df["Cathode Capacity (mAh)"])
     n = actual_ratio.shape[0]
 
     # Cells outside N:P ratio limits are rejected, given the same cost scaled by rejection_cost_factor
@@ -203,7 +206,7 @@ def cost_matrix_assign_3d(df, rejection_cost_factor = 2 , exact=False):
     n = len(df)
 
     # Convert all 1D arrays to 3D n x n x n arrays
-    anode_capacity = np.array(df["Anode Capacity (mAh)"])
+    anode_capacity = np.array(df["N:P ratio overlap factor"] * df["Anode Capacity (mAh)"])
     anode_capacity = np.tile(anode_capacity[:, np.newaxis, np.newaxis], (1, n, n))
     cathode_capacity = np.array(df["Cathode Capacity (mAh)"])
     cathode_capacity = np.tile(cathode_capacity[np.newaxis, :, np.newaxis], (n, 1, n))
@@ -268,14 +271,14 @@ def rearrange_electrode_columns(df, row_indices, anode_ind, cathode_ind, ratio_i
         df.loc[row_indices, column] = df_immutable.loc[row_indices[ratio_ind], column].values
 
 
-def update_cell_numbers(df, check_NP_ratio=True):
+def update_cell_numbers(df, base_sample_id, check_NP_ratio=True):
     """Update the cell numbers in the main dataframe, df, based on the accepted cells.
     
     Args:
         df (pandas.DataFrame): The dataframe containing the cell assembly data.
     """
     if check_NP_ratio:
-        df["Actual N:P Ratio"] = df["Anode Capacity (mAh)"] / df["Cathode Capacity (mAh)"]
+        df["Actual N:P Ratio"] = df["N:P ratio overlap factor"] * df["Anode Capacity (mAh)"] / df["Cathode Capacity (mAh)"]
         cell_meets_criteria = ((df["Actual N:P Ratio"] >= df["Minimum N:P Ratio"])
                                 & (df["Actual N:P Ratio"] <= df["Maximum N:P Ratio"]))
         accepted_cell_indices = np.where(cell_meets_criteria)[0]
@@ -297,6 +300,7 @@ def update_cell_numbers(df, check_NP_ratio=True):
     df["Cell Number"] = 0
     for cell_number, cell_index in enumerate(accepted_cell_indices):
         df.loc[cell_index, "Cell Number"] = cell_number + 1
+        df.loc[cell_index, "Sample ID"] = f"{base_sample_id}_{cell_number + 1}"
 
 
 def main():
@@ -341,6 +345,10 @@ def main():
                 (df["Error Code"] == 0)
             )
             df_batch = df[batch_mask]
+            # if no cells in this batch, skip
+            if len(df_batch) == 0:
+                print(f"Skipping batch number {batch_number} as there are no available cells.")
+                continue
             row_indices = np.where(batch_mask)[0]
             n_rows = len(row_indices)
             n_rows_skipped = sum(df["Batch Number"] == batch_number) - n_rows
@@ -402,11 +410,15 @@ def main():
             # Rearrange the electrodes in the main dataframe
             rearrange_electrode_columns(df, row_indices, anode_ind, cathode_ind, ratio_ind)
 
-        # Update the actual N:P ratio and accepted cell numbers in the main dataframe
+        # Read base_sample_id from the settings table
+        df_settings = pd.read_sql("SELECT * FROM Settings_Table", conn)
+        base_sample_id = df_settings.loc[df_settings["key"] == "Base Sample ID", "value"].values[0]
+
+        # Update the actual N:P ratio, accepted cell numbers and sample ID in the main dataframe
         if sorting_method == 0:
-            update_cell_numbers(df, check_NP_ratio=False)
+            update_cell_numbers(df, base_sample_id, check_NP_ratio=False)
         else:
-            update_cell_numbers(df)
+            update_cell_numbers(df, base_sample_id)
 
         # Write the updated table back to the database
         df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace")
