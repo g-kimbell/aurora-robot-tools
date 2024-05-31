@@ -72,6 +72,9 @@ def calculate_capacity(df):
         df[f"{xode} Capacity (mAh)"] = (
             1e-3 * df[f"{xode} Active Material Weight (mg)"] * df[f"{xode} Nominal Specific Capacity (mAh/g)"]
         )
+        if (df[f"{xode} Capacity (mAh)"] < 0).any():
+            print(f"WARNING: {xode} capacities below 0, setting to NaN")
+            df.loc[df[f"{xode} Capacity (mAh)"] < 0, f"{xode} Capacity (mAh)"] = np.nan
     # HACK not using actual diameters, since this doesn't work if electrode numbers are unequal
     # The robot can only use 15 mm and 14 mm electrodes anyway
     df["N:P ratio overlap factor"] = 14**2 / 15**2
@@ -291,8 +294,8 @@ def update_cell_numbers(df, base_sample_id, check_NP_ratio=True):
     else:
         # accept any cell with an anode and cathode
         accepted_cell_indices = np.where(
-            ~df["Anode Capacity (mAh)"].isnull() &
-            ~df["Cathode Capacity (mAh)"].isnull()
+            ~df["Anode Type"].isnull() &
+            ~df["Cathode Type"].isnull()
         )[0]
         print(f'Accepted {len(accepted_cell_indices)} cells without checking N:P ratio.')
 
@@ -300,7 +303,7 @@ def update_cell_numbers(df, base_sample_id, check_NP_ratio=True):
     df["Cell Number"] = 0
     for cell_number, cell_index in enumerate(accepted_cell_indices):
         df.loc[cell_index, "Cell Number"] = cell_number + 1
-        df.loc[cell_index, "Sample ID"] = f"{base_sample_id}_{cell_number + 1}"
+        df.loc[cell_index, "Sample ID"] = f"{base_sample_id}_{cell_number + 1:02d}"
 
 
 def main():
@@ -342,7 +345,9 @@ def main():
             batch_mask = (
                 (df["Batch Number"] == batch_number) &
                 (df["Last Completed Step"] == 0) &
-                (df["Error Code"] == 0)
+                (df["Error Code"] == 0) &
+                (df["Anode Capacity (mAh)"] > 0) &
+                (df["Cathode Capacity (mAh)"] > 0)
             )
             df_batch = df[batch_mask]
             # if no cells in this batch, skip
