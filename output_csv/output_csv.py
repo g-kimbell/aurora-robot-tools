@@ -27,6 +27,7 @@ column_conversion = {
     "Rack Position" : "Rack_Position",
     "Separator" : "Separator",
     "Electrolyte" : "Electrolyte",
+    "Electrolyte Name" : "Electrolyte",
     "Electrolyte Position" : "Electrolyte Position",
     "Electrolyte Amount (uL)": "Electrolyte Amount",
     "Anode Rack Position": "Anode Position",
@@ -58,7 +59,14 @@ column_conversion = {
 }
 
 with sqlite3.connect(DATABASE_FILEPATH) as conn:
-    df = pd.read_sql("SELECT * FROM Cell_Assembly_Table", conn)
+    # Get cell assembly table for finished cells
+    df = pd.read_sql("SELECT * FROM Cell_Assembly_Table WHERE `Last Completed Step` >= 10", conn)
+    # If df is empty (no finished cells), exit
+    if df.empty:
+        print("No finished cells found in database.")
+        print("No output file created.")
+        exit()
+    # Add activate material weight columns if they don't exist
     for xode in ["Anode", "Cathode"]:
         if f"{xode} Active Material Weight (mg)" not in df.columns:
             df[f"{xode} Active Material Weight (mg)"] = (
@@ -66,6 +74,22 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
                 * df[f"{xode} Active Material Weight Fraction"]
             )
 
-    df = df[column_conversion.keys()]
-    df.rename(columns=column_conversion, inplace=True)
+    # Get base sample ID from settings table, add to df
+    df_settings = pd.read_sql("SELECT * FROM Settings_Table", conn)
+    base_sample_id = df_settings.loc[df_settings["key"] == "Base Sample ID", "value"].values[0]
+    df["Run ID"] = base_sample_id
+
+    # Remove Current Press Number and Error Code columns
+    df = df.drop(columns=["Current Press Number", "Error Code"])
+
+    # Get timestamp table, pivot so step numbers are columns, merge with cell assembly table
+    df_timestamp = pd.read_sql("SELECT * FROM Timestamp_Table", conn)
+    df_timestamp = df_timestamp.pivot(index="Cell Number", columns="Step Number", values="Timestamp")
+    df_timestamp.columns = [f"Timestamp Step {col}" for col in df_timestamp.columns]
+    df = pd.merge(df, df_timestamp, on="Cell Number") # INNER merge
     df.to_csv(output_filepath, index=False, sep=";")
+
+    # Create a csv file that can be read by AiiDA
+    column_conversion = {old: new for old, new in column_conversion.items() if old in df.columns}
+    df.rename(columns=column_conversion, inplace=True)
+    df.to_csv(output_filepath[:-4]+"_aiida.csv", index=False, sep=";")
