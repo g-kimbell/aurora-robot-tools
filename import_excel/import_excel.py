@@ -66,10 +66,10 @@ if input_filepath:
     df["Electrolyte Description"] = df["Electrolyte Position"].map(
         df_electrolyte.set_index("Electrolyte Position")["Description"]
         )
-    df["Electrolyte Amount Before Seperator (uL)"] = df["Electrolyte Amount (uL)"] * (
+    df["Electrolyte Amount Before Separator (uL)"] = df["Electrolyte Amount (uL)"] * (
         (df["Electrolyte Dispense Order"]=="Before") + 0.5*(df["Electrolyte Dispense Order"]=="Both")
         )
-    df["Electrolyte Amount After Seperator (uL)"] = df["Electrolyte Amount (uL)"] * (
+    df["Electrolyte Amount After Separator (uL)"] = df["Electrolyte Amount (uL)"] * (
         (df["Electrolyte Dispense Order"]=="After") + 0.5*(df["Electrolyte Dispense Order"]=="Both")
         )
 
