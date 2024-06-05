@@ -69,12 +69,12 @@ def calculate_capacity(df):
             (df[f"{xode} Weight (mg)"] - df[f"{xode} Current Collector Weight (mg)"])
             * df[f"{xode} Active Material Weight Fraction"]
         )
-        df[f"{xode} Capacity (mAh)"] = (
-            1e-3 * df[f"{xode} Active Material Weight (mg)"] * df[f"{xode} Nominal Specific Capacity (mAh/g)"]
+        df[f"{xode} Balancing Capacity (mAh)"] = (
+            1e-3 * df[f"{xode} Active Material Weight (mg)"] * df[f"{xode} Balancing Specific Capacity (mAh/g)"]
         )
-        if (df[f"{xode} Capacity (mAh)"] < 0).any():
+        if (df[f"{xode} Balancing Capacity (mAh)"] < 0).any():
             print(f"WARNING: {xode} capacities below 0, setting to NaN")
-            df.loc[df[f"{xode} Capacity (mAh)"] < 0, f"{xode} Capacity (mAh)"] = np.nan
+            df.loc[df[f"{xode} Balancing Capacity (mAh)"] < 0, f"{xode} Balancing Capacity (mAh)"] = np.nan
     # HACK not using actual diameters, since this doesn't work if electrode numbers are unequal
     # The robot can only use 15 mm and 14 mm electrodes anyway
     df["N:P ratio overlap factor"] = 14**2 / 15**2
@@ -94,7 +94,7 @@ def cost_matrix_assign(df, rejection_cost_factor = 2):
         tuple: The indices of the optimal matching of anodes and cathodes.
     """
     # Calculate all possible N:P ratios
-    actual_ratio = np.outer(df["N:P ratio overlap factor"] * df["Anode Capacity (mAh)"], 1 / df["Cathode Capacity (mAh)"])
+    actual_ratio = np.outer(df["N:P ratio overlap factor"] * df["Anode Balancing Capacity (mAh)"], 1 / df["Cathode Balancing Capacity (mAh)"])
     n = actual_ratio.shape[0]
 
     # Cells outside N:P ratio limits are rejected, given the same cost scaled by rejection_cost_factor
@@ -209,9 +209,9 @@ def cost_matrix_assign_3d(df, rejection_cost_factor = 2 , exact=False):
     n = len(df)
 
     # Convert all 1D arrays to 3D n x n x n arrays
-    anode_capacity = np.array(df["N:P ratio overlap factor"] * df["Anode Capacity (mAh)"])
+    anode_capacity = np.array(df["N:P ratio overlap factor"] * df["Anode Balancing Capacity (mAh)"])
     anode_capacity = np.tile(anode_capacity[:, np.newaxis, np.newaxis], (1, n, n))
-    cathode_capacity = np.array(df["Cathode Capacity (mAh)"])
+    cathode_capacity = np.array(df["Cathode Balancing Capacity (mAh)"])
     cathode_capacity = np.tile(cathode_capacity[np.newaxis, :, np.newaxis], (n, 1, n))
     target_ratio = np.array(df["Target N:P Ratio"])
     target_ratio = np.tile(target_ratio[np.newaxis, np.newaxis, :], (n, n, 1))
@@ -281,7 +281,7 @@ def update_cell_numbers(df, base_sample_id, check_NP_ratio=True):
         df (pandas.DataFrame): The dataframe containing the cell assembly data.
     """
     if check_NP_ratio:
-        df["Actual N:P Ratio"] = df["N:P ratio overlap factor"] * df["Anode Capacity (mAh)"] / df["Cathode Capacity (mAh)"]
+        df["Actual N:P Ratio"] = df["N:P ratio overlap factor"] * df["Anode Balancing Capacity (mAh)"] / df["Cathode Balancing Capacity (mAh)"]
         cell_meets_criteria = ((df["Actual N:P Ratio"] >= df["Minimum N:P Ratio"])
                                 & (df["Actual N:P Ratio"] <= df["Maximum N:P Ratio"]))
         accepted_cell_indices = np.where(cell_meets_criteria)[0]
@@ -331,10 +331,8 @@ def main():
 
     # Connect to the database and create the Cell_Assembly_Table
     with sqlite3.connect(DATABASE_FILEPATH) as conn:
-        # Read the table Cell_Assembly_Table from the database
+        # Read from database and calculate capacity
         df = pd.read_sql("SELECT * FROM Cell_Assembly_Table", conn)
-
-        # Calculate the capacity of the anodes and cathodes
         calculate_capacity(df)
 
         # Split the dataframe into sub-dataframes for each batch number
@@ -346,8 +344,8 @@ def main():
                 (df["Batch Number"] == batch_number) &
                 (df["Last Completed Step"] == 0) &
                 (df["Error Code"] == 0) &
-                (df["Anode Capacity (mAh)"] > 0) &
-                (df["Cathode Capacity (mAh)"] > 0)
+                (df["Anode Balancing Capacity (mAh)"] > 0) &
+                (df["Cathode Balancing Capacity (mAh)"] > 0)
             )
             df_batch = df[batch_mask]
             # if no cells in this batch, skip
@@ -376,8 +374,8 @@ def main():
 
                 case 2: # Order by capacity
                     # I think this is always worse than the cost matrix approach
-                    anode_sort = np.argsort(df_batch["Anode Capacity (mAh)"])
-                    cathode_sort = np.argsort(df_batch["Cathode Capacity (mAh)"])
+                    anode_sort = np.argsort(df_batch["Anode Balancing Capacity (mAh)"])
+                    cathode_sort = np.argsort(df_batch["Cathode Balancing Capacity (mAh)"])
                     # Ensure that anode positions do not change
                     anode_ind = np.arange(n_rows)
                     cathode_ind = cathode_sort[np.argsort(anode_sort)]
