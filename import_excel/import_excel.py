@@ -84,13 +84,13 @@ if input_filepath:
     # Add columns which will be filled in later
     df["Anode Weight (mg)"] = 0
     df["Anode Active Material Weight (mg)"] = 0
-    df["Anode Capacity (mAh)"] = 0
+    df["Anode Balancing Capacity (mAh)"] = 0
     df["Anode Rack Position"] = 0
     df["Cathode Weight (mg)"] = 0
     df["Cathode Active Material Weight (mg)"] = 0
-    df["Cathode Capacity (mAh)"] = 0
+    df["Cathode Balancing Capacity (mAh)"] = 0
     df["Cathode Rack Position"] = 0
-    df["N:P ratio overlap factor"] = df["Cathode Diameter (mm)"]**2 / df["Anode Diameter (mm)"]**2
+    df["N:P ratio overlap factor"] = 14**2 / 15**2 # HACK this is fixed, but useful to store for future
     df["Actual N:P Ratio"] = 0
     df["Cell Number"] = 0
     df["Last Completed Step"] = 0
@@ -110,7 +110,13 @@ if input_filepath:
     # Warnings to the user
     columns_to_check = [
         'Anode Type',
+        'Anode Balancing Specific Capacity (mAh/g)',
+        'Anode C-rate Definition Specific Capacity (mAh/g)',
+        'Anode C-rate Definition Areal Capacity (mAh/cm2)',
         'Cathode Type',
+        'Cathode Balancing Specific Capacity (mAh/g)',
+        'Cathode C-rate Definition Specific Capacity (mAh/g)',
+        'Cathode C-rate Definition Areal Capacity (mAh/cm2)',
         'Target N:P Ratio',
         'Minimum N:P Ratio',
         'Maximum N:P Ratio',
