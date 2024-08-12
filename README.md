@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/93ce6402-2a82-4681-8fe6-309664594d0a" width="500" align="center" alt="Aurora robot tools">
+  <img src="https://github.com/user-attachments/assets/a0de8809-3ea8-42d5-abc4-049c9d8e3e61" width="500" align="center" alt="Aurora robot tools">
 </p>
 </br>
 
