@@ -1,5 +1,6 @@
-"""
-Convert the finished database to a csv file that can be read by AiiDA.
+""" Copyright © 2024, Empa, Graham Kimbell, Enea Svaluto-Ferro, Ruben Kuhnel, Corsin Battaglia
+
+Convert the finished database to a csv file that can be read by Aurora and AiiDA.
 """
 import sqlite3
 from tkinter import Tk, filedialog

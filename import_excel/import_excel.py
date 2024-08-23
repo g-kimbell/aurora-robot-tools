@@ -1,4 +1,5 @@
-"""
+""" Copyright © 2024, Empa, Graham Kimbell, Enea Svaluto-Ferro, Ruben Kuhnel, Corsin Battaglia
+
 Read the user input Excel file and write the data to a SQL database.
 
 Users should use the prepared Excel file, "Input with electrode table.xlsx", to input all of the

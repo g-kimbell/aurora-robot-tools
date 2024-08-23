@@ -1,4 +1,5 @@
-"""
+""" Copyright © 2024, Empa, Graham Kimbell, Enea Svaluto-Ferro, Ruben Kuhnel, Corsin Battaglia
+
 Determine the electrolyte mixing steps required.
 
 The script reads the electrolytes required and their volumes from the Cell_Assembly_Table in the 

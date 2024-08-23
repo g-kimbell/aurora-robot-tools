@@ -1,4 +1,5 @@
-"""
+""" Copyright © 2024, Empa, Graham Kimbell, Enea Svaluto-Ferro, Ruben Kuhnel, Corsin Battaglia
+
 Match cathodes with anodes to achieve the desired N:P ratio.
 
 The script reads the weights measured by the cell assembly robot, along with other input parameters,

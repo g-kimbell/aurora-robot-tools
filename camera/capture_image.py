@@ -1,3 +1,9 @@
+""" Copyright © 2024, Empa, Graham Kimbell, Enea Svaluto-Ferro, Ruben Kuhnel, Corsin Battaglia
+
+Simple script to capture an image from the camera and save as png and raw 12-bit numpy array.
+
+"""
+
 import os
 import sys
 from datetime import datetime

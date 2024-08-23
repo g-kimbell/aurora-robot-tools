@@ -1,4 +1,5 @@
-"""
+""" Copyright © 2024, Empa, Graham Kimbell, Enea Svaluto-Ferro, Ruben Kuhnel, Corsin Battaglia
+
 Assigns cell numbers to presses.
 
 Data is read from the Cell_Assembly_Table and Press_Table tables in the chemspeedDB database. The

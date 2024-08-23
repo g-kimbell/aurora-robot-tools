@@ -1,3 +1,9 @@
+""" Copyright © 2024, Empa, Graham Kimbell, Enea Svaluto-Ferro, Ruben Kuhnel, Corsin Battaglia
+
+Script to backup the chemspeedDB database to a folder with the base sample ID as the filename.
+
+"""
+
 import os
 import sqlite3
 from datetime import datetime
