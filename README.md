@@ -7,16 +7,23 @@ Scripts to enhance the functionality of the Aurora battery assembly robot at Emp
 
 These scripts are used within the Chemspeed AutoSuite Editor program to give additional functions beyond what is possible within AutoSuite, such as electrode balancing and data management.
 
-
-### Why are there Go and exe files?
-
-The scripts are written in Python, and interact with a SQL database that is read by the AutoSuite program. AutoSuite cannot run Python files direction, instead one can use a "Run Executable" command which currently only works for .exe files, therefore I have written a simple script in Go which runs the Python script from the command line, but can be called from an .exe. I chose this over PyInstaller since this bundles the whole of Python and all the libraries within each exectuable, so we would end up with many very large files that take a long time to load, and there are issues with antivirus for .bat to .exe conversion.
+The scripts are written in Python, and interact with a SQL database that is read by the AutoSuite program. AutoSuite cannot run Python files direction, instead one can use a "Run Executable" command which currently only works for .exe files. Go scripts are complied to make simple exes which run Python scripts from the command line with standard input and output. This was used instead of e.g. PyInstaller to reduce the space required and speed up execution.
 
 
-### Installation
+## Installation
 
 Clone the repo to your prefered location, and install the requirements in requirements.txt. Ensure that the AutoSuite database location matches those in the scripts.
 
 To compile the Go scripts, install Go, in the terminal navigate to the script folder, and use the command 'go build <script_name>.go'.
 
-From AutoSuite Editor, use the "Run Executable" command in the Task View and point it to the .exe file you have compiled.
+## Usage
+
+The executables or Python scripts can be run directly from the command line, or use from within AutoSuite Editor,use the "Run Executable" command in the Task View and point it to the .exe file you have compiled.
+
+## Contributors
+
+- [Graham Kimbell](https://github.com/g-kimbell)
+
+## Acknowledgements
+
+This software was developed at the Materials for Energy Conversion Lab at the Swiss Federal Laboratories for Materials Science and Technology (Empa).
