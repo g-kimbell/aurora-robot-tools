@@ -63,7 +63,7 @@ column_conversion = {
 
 with sqlite3.connect(DATABASE_FILEPATH) as conn:
     # Get cell assembly table for finished cells
-    df = pd.read_sql("SELECT * FROM Cell_Assembly_Table WHERE `Last Completed Step` >= 10", conn)
+    df = pd.read_sql("SELECT * FROM Cell_Assembly_Table WHERE `Last Completed Step` >= 10 AND `Error Code` = 0", conn)
     # If df is empty (no finished cells), exit
     if df.empty:
         print("No finished cells found in database.")
