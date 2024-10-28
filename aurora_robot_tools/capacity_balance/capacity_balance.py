@@ -100,11 +100,11 @@ def cost_matrix_assign(df, rejection_cost_factor = 2):
 
     # Cells outside N:P ratio limits are rejected, given the same cost scaled by rejection_cost_factor
     for i in range(n):
-        actual_ratio[i, actual_ratio[i] > df["Maximum N:P Ratio"].loc[i]] = (
-            df["Maximum N:P Ratio"].loc[i] * rejection_cost_factor
+        actual_ratio[i, actual_ratio[i] > df["Maximum N:P Ratio"].iloc[i]] = (
+            df["Maximum N:P Ratio"].iloc[i] * rejection_cost_factor
         )
-        actual_ratio[i, actual_ratio[i] < df["Minimum N:P Ratio"].loc[i]] = (
-            df["Minimum N:P Ratio"].loc[i] / rejection_cost_factor
+        actual_ratio[i, actual_ratio[i] < df["Minimum N:P Ratio"].iloc[i]] = (
+            df["Minimum N:P Ratio"].iloc[i] / rejection_cost_factor
         )
 
     # Calculate the cost matrix
@@ -379,7 +379,7 @@ def main():
                     cathode_sort = np.argsort(df_batch["Cathode Balancing Capacity (mAh)"])
                     # Ensure that anode positions do not change
                     anode_ind = np.arange(n_rows)
-                    cathode_ind = cathode_sort[np.argsort(anode_sort)]
+                    cathode_ind = cathode_sort.iloc[np.argsort(anode_sort)]
                     ratio_ind = np.arange(n_rows)
 
                 case 3: # Use cost matrix and linear sum assignment
