@@ -87,8 +87,19 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
 
     # Add Run ID to dataframe
     df["Run ID"] = run_id
-    # Remove Current Press Number and Error Code columns
-    df = df.drop(columns=["Current Press Number", "Error Code"])
+    # Remove certain columns, these are either unnecessary or will be recalculated
+    columns_to_drop = [
+        "Last Completed Step",
+        "Current Press Number",
+        "Error Code",
+        "Anode Active Material Weight (mg)",
+        "Anode Balancing Capacity (mAh)",
+        "Cathode Active Material Weight (mg)",
+        "Cathode Balancing Capacity (mAh)",
+        "N:P ratio overlap factor",
+        "Actual N:P Ratio",
+    ]
+    df = df.drop(columns=columns_to_drop)
     # Get timestamp table, pivot so step numbers are columns, merge with cell assembly table
     df_timestamp = pd.read_sql("SELECT * FROM Timestamp_Table", conn)
     # Remove rows with the same cell number and step number, keep the latest timestamp
