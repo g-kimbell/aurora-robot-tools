@@ -107,6 +107,11 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
     df_timestamp = df_timestamp.pivot(index="Cell Number", columns="Step Number", values="Timestamp")
     df_timestamp.columns = [f"Timestamp Step {col}" for col in df_timestamp.columns]
     df = pd.merge(df, df_timestamp, on="Cell Number", how="left") # LEFT merge
+
+    # Remove any semi-colons from the dataframe that could break the csv file
+    df = df.replace(";", ".", regex=True)
+
+    # Output dataframe to a csv file
     df.to_csv(output_filepath, index=False, sep=";")
 
     # Create a csv file that can be read by AiiDA
