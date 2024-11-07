@@ -78,11 +78,17 @@ if input_filepath:
     )
 
     # Fill the details for electrode properties
-    # df_anode is df_electrodes where 'anode' is in the column name, df_cathode same for cathode
+    # df_anode is df_electrodes where 'anode' is in the column name
     df_anode = df_electrodes[[col for col in df_electrodes.columns if "Anode" in col]]
     df_anode = df_anode.dropna(subset=["Anode Type"])
+    # if diameter is missing or 0, set to 15 mm
+    df_anode["Anode Diameter (mm)"] = df_anode["Anode Diameter (mm)"].fillna(15).replace(0, 15)
+
+    # df_cathode is df_electrodes where 'cathode' is in the column name
     df_cathode = df_electrodes[[col for col in df_electrodes.columns if "Cathode" in col]]
     df_cathode = df_cathode.dropna(subset=["Cathode Type"])
+    # if diameter is missing or 0, set to 14 mm
+    df_cathode["Cathode Diameter (mm)"] = df_cathode["Cathode Diameter (mm)"].fillna(14).replace(0, 14)
 
     # If Anode Type or Cathode Type contains duplicates, raise an error
     if df_anode["Anode Type"].duplicated().any() or df_cathode["Cathode Type"].duplicated().any():
