@@ -13,6 +13,7 @@ Usage:
 """
 
 import os
+import sys
 import sqlite3
 import warnings
 from tkinter import Tk, filedialog
@@ -75,12 +76,23 @@ if input_filepath:
         )
 
     # Fill the details for electrode properties
-    anode_columns = [col for col in df_electrodes.columns if "Anode" in col and col != "Anode Type"]
-    cathode_columns = [col for col in df_electrodes.columns if "Cathode" in col and col != "Cathode Type"]
-    for column in anode_columns:
-        df[column] = df["Anode Type"].map(df_electrodes.set_index("Anode Type")[column])
-    for column in cathode_columns:
-        df[column] = df["Cathode Type"].map(df_electrodes.set_index("Cathode Type")[column])
+    # df_anode is df_electrodes where 'anode' is in the column name, df_cathode same for cathode
+    df_anode = df_electrodes[[col for col in df_electrodes.columns if "Anode" in col]]
+    df_anode = df_anode.dropna(subset=["Anode Type"])
+    df_cathode = df_electrodes[[col for col in df_electrodes.columns if "Cathode" in col]]
+    df_cathode = df_cathode.dropna(subset=["Cathode Type"])
+
+    # If Anode Type or Cathode Type contains duplicates, raise an error
+    if df_anode["Anode Type"].duplicated().any() or df_cathode["Cathode Type"].duplicated().any():
+        print(
+            "CRITICAL: Anode Type or Cathode Type in electrode properties table contains "
+            "duplicates. Check the input file.",
+        )
+        sys.exit(1)
+
+    # Merge with input table on Anode Type and Cathode Type
+    df = df.merge(df_anode, on="Anode Type", how="left")
+    df = df.merge(df_cathode, on="Cathode Type", how="left")
 
     # Add columns which will be filled in later
     df["Anode Weight (mg)"] = 0
