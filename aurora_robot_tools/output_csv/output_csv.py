@@ -105,8 +105,14 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
     # Get timestamp table, pivot so step numbers are columns, merge with cell assembly table
     df_timestamp = pd.read_sql("SELECT * FROM Timestamp_Table", conn)
     # Remove rows with the same cell number and step number, keep the latest timestamp
-    df_timestamp = df_timestamp.sort_values("Timestamp", ascending=False).drop_duplicates(["Cell Number", "Step Number"])
-    df_timestamp = df_timestamp.pivot_table(index="Cell Number", columns="Step Number", values="Timestamp")
+    df_timestamp = df_timestamp.sort_values("Timestamp",ascending=False)
+    df_timestamp = df_timestamp.drop_duplicates(["Cell Number", "Step Number"])
+    df_timestamp = df_timestamp.pivot_table(
+        index="Cell Number",
+        columns="Step Number",
+        values="Timestamp",
+        aggfunc="last",
+    )
     df_timestamp.columns = [f"Timestamp Step {col}" for col in df_timestamp.columns]
     df = df.merge(df_timestamp, on="Cell Number", how="left") # LEFT merge
 
