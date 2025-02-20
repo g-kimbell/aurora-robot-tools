@@ -39,6 +39,8 @@ Usage:
         6 - Choose automatically (default)
                 If N:P ratios do not change, use 2D matching (method 3), otherwise try exact 3D
                 (method 5), if too slow use greedy 3D (method 4)
+        7 - Sort the anodes and cathodes by capacity in reverse order
+                Maximises the spread of N:P ratios
 
 Todo:
     - Make rejection_cost_factor an argument when AutoSuite supports it.
@@ -423,6 +425,15 @@ def main() -> None:
                         except ValueError:
                             print("Exact matching took too long, using greedy matching instead")
                             anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch)
+
+                case 7: # Reverse order by capacity
+                    # maximises N:P spread
+                    anode_sort = np.argsort(df_batch["Anode Balancing Capacity (mAh)"])
+                    cathode_sort = np.argsort(df_batch["Cathode Balancing Capacity (mAh)"]).iloc[::-1]
+                    # Ensure that anode positions do not change
+                    anode_ind = np.arange(n_rows)
+                    cathode_ind = cathode_sort.iloc[np.argsort(anode_sort)]
+                    ratio_ind = np.arange(n_rows)
 
             # Rearrange the electrodes in the main dataframe
             rearrange_electrode_columns(df, row_indices, anode_ind, cathode_ind, ratio_ind)
