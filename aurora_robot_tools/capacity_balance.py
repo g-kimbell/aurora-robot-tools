@@ -2,7 +2,7 @@
 
 Match cathodes with anodes to achieve the desired N:P ratio.
 
-The script reads the weights measured by the cell assembly robot, along with other input parameters,
+The script reads the masses measured by the cell assembly robot, along with other input parameters,
 from the Cell_Assembly_Table in the chemspeedDB database. The preferred method calculates every
 possible N:P ratio from all anodes and cathode combinations, then uses the linear sum assignment
 algorithm to find the optimal matching of anodes and cathodes. The script then writes the updated
@@ -70,12 +70,12 @@ def calculate_capacity(df: pd.DataFrame) -> None:
 
     """
     for xode in ["Anode", "Cathode"]:
-        df[f"{xode} Active Material Weight (mg)"] = (
-            (df[f"{xode} Weight (mg)"] - df[f"{xode} Current Collector Weight (mg)"])
-            * df[f"{xode} Active Material Weight Fraction"]
+        df[f"{xode} Active Material Mass (mg)"] = (
+            (df[f"{xode} Mass (mg)"] - df[f"{xode} Current Collector Mass (mg)"])
+            * df[f"{xode} Active Material Mass Fraction"]
         )
         df[f"{xode} Balancing Capacity (mAh)"] = (
-            1e-3 * df[f"{xode} Active Material Weight (mg)"] * df[f"{xode} Balancing Specific Capacity (mAh/g)"]
+            1e-3 * df[f"{xode} Active Material Mass (mg)"] * df[f"{xode} Balancing Specific Capacity (mAh/g)"]
         )
         if (df[f"{xode} Balancing Capacity (mAh)"] < 0).any():
             print(f"WARNING: {xode} capacities below 0, setting to NaN")

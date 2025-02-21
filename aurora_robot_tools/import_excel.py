@@ -123,12 +123,12 @@ if input_filepath:
         df[f"{spacer_pos} Spacer Thickness (mm)"] = df[f"{spacer_pos} Spacer Thickness (mm)"].fillna(0)
 
     # Add columns which will be filled in later
-    df["Anode Weight (mg)"] = 0
-    df["Anode Active Material Weight (mg)"] = 0
+    df["Anode Mass (mg)"] = 0
+    df["Anode Active Material Mass (mg)"] = 0
     df["Anode Balancing Capacity (mAh)"] = 0
     df["Anode Rack Position"] = 0
-    df["Cathode Weight (mg)"] = 0
-    df["Cathode Active Material Weight (mg)"] = 0
+    df["Cathode Mass (mg)"] = 0
+    df["Cathode Active Material Mass (mg)"] = 0
     df["Cathode Balancing Capacity (mAh)"] = 0
     df["Cathode Rack Position"] = 0
     df["N:P ratio overlap factor"] = 0
@@ -143,8 +143,8 @@ if input_filepath:
     # First filling of anode and cathode positions
     df.loc[df["Anode Type"].notna(), "Anode Rack Position"] = df["Rack Position"]
     df.loc[df["Cathode Type"].notna(), "Cathode Rack Position"] = df["Rack Position"]
-    df.loc[df["Anode Type"].notna(), "Anode Weight (mg)"] = 0
-    df.loc[df["Cathode Type"].notna(), "Cathode Weight (mg)"] = 0
+    df.loc[df["Anode Type"].notna(), "Anode Mass (mg)"] = 0
+    df.loc[df["Cathode Type"].notna(), "Cathode Mass (mg)"] = 0
 
     # Set the first few columns, the rest in alphabetical order
     columns = df.columns.tolist()
