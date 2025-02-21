@@ -16,6 +16,7 @@ import os
 import sqlite3
 import sys
 import warnings
+from pathlib import Path
 from tkinter import Tk, filedialog
 
 import pandas as pd
@@ -28,10 +29,12 @@ DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
 # Open dialog to select the input file
 DEFAULT_INPUT_FILEPATH = "%userprofile%\\Desktop\\Inputs"
 Tk().withdraw()  # to hide the main window
-input_filepath = filedialog.askopenfilename(
-    initialdir = DEFAULT_INPUT_FILEPATH,
-    title = "Select the input Excel file",
-    filetypes = [("Excel files", "*.xlsx")],
+input_filepath = Path(
+    filedialog.askopenfilename(
+        initialdir = DEFAULT_INPUT_FILEPATH,
+        title = "Select the input Excel file",
+        filetypes = [("Excel files", "*.xlsx")],
+    ),
 )
 
 exit_code=0
@@ -60,9 +63,8 @@ if input_filepath:
 
     # Create the settings table
     df_settings = pd.DataFrame()
-    filename_without_ext, _ = os.path.splitext(os.path.basename(input_filepath))
     df_settings["key"] = ["Input Filepath","Base Sample ID"]
-    df_settings["value"] = [input_filepath,filename_without_ext]
+    df_settings["value"] = [str(input_filepath),str(input_filepath.stem)]
 
     # Create the timestamp table
     df_timestamp = pd.DataFrame(columns = ["Cell Number","Step Number","Timestamp"])
