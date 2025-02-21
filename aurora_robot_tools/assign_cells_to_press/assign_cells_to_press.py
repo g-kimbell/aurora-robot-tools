@@ -35,6 +35,8 @@ import pandas as pd
 
 DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
 
+RETURN_STEP = 140  # Step number for returned cell in robot recipe
+
 if len(sys.argv) >= 2:
     link_rack_pos_to_press = bool(sys.argv[1])
 else:
@@ -65,7 +67,7 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
     # finished assembly, with no error code, and find their cell numbers and electrolyte positions
     available_rack_pos = np.where(
         (df["Cell Number"]>0) &
-        (df["Last Completed Step"]<11) &
+        (df["Last Completed Step"]<RETURN_STEP) &
         (df["Error Code"]==0) &
         (df["Current Press Number"]==0)
         )[0]+1
