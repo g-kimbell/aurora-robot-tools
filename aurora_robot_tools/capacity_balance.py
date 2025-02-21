@@ -105,15 +105,15 @@ def cost_matrix_assign(df: pd.DataFrame, rejection_cost_factor: float = 2) -> tu
 
     # Cells outside N:P ratio limits are rejected, given the same cost scaled by rejection_cost_factor
     for i in range(n):
-        actual_ratio[i, actual_ratio[i] > df["Maximum N:P Ratio"].iloc[i]] = (
-            df["Maximum N:P Ratio"].iloc[i] * rejection_cost_factor
+        actual_ratio[i, actual_ratio[i] > df["N:P Ratio Maximum"].iloc[i]] = (
+            df["N:P Ratio Maximum"].iloc[i] * rejection_cost_factor
         )
-        actual_ratio[i, actual_ratio[i] < df["Minimum N:P Ratio"].iloc[i]] = (
-            df["Minimum N:P Ratio"].iloc[i] / rejection_cost_factor
+        actual_ratio[i, actual_ratio[i] < df["N:P Ratio Minimum"].iloc[i]] = (
+            df["N:P Ratio Minimum"].iloc[i] / rejection_cost_factor
         )
 
     # Calculate the cost matrix
-    cost_matrix = np.abs(actual_ratio - np.outer(df["Target N:P Ratio"], np.ones(n)))
+    cost_matrix = np.abs(actual_ratio - np.outer(df["N:P Ratio Target"], np.ones(n)))
 
     # Prefer unassigned cathodes to not swap with each other
     # by making nans on the diagonal cost very slightly less
@@ -227,11 +227,11 @@ def cost_matrix_assign_3d(
     anode_capacity = np.tile(anode_capacity[:, np.newaxis, np.newaxis], (1, n, n))
     cathode_capacity = np.array(df["Cathode Balancing Capacity (mAh)"]/df["Cathode Diameter (mm)"]**2)
     cathode_capacity = np.tile(cathode_capacity[np.newaxis, :, np.newaxis], (n, 1, n))
-    target_ratio = np.array(df["Target N:P Ratio"])
+    target_ratio = np.array(df["N:P Ratio Target"])
     target_ratio = np.tile(target_ratio[np.newaxis, np.newaxis, :], (n, n, 1))
-    min_ratio = np.array(df["Minimum N:P Ratio"])
+    min_ratio = np.array(df["N:P Ratio Minimum"])
     min_ratio = np.tile(min_ratio[np.newaxis, np.newaxis, :], (n, n, 1))
-    max_ratio = np.array(df["Maximum N:P Ratio"])
+    max_ratio = np.array(df["N:P Ratio Maximum"])
     max_ratio = np.tile(max_ratio[np.newaxis, np.newaxis, :], (n, n, 1))
 
     # Calculate the 3D cost matrix
@@ -284,7 +284,7 @@ def rearrange_electrode_columns(
     """
     anode_columns = [col for col in df.columns if "Anode" in col]
     cathode_columns = [col for col in df.columns if "Cathode" in col]
-    ratio_columns = ["Target N:P Ratio", "Minimum N:P Ratio", "Maximum N:P Ratio"]
+    ratio_columns = ["N:P Ratio Target", "N:P Ratio Minimum", "N:P Ratio Maximum"]
     df_immutable = df.copy()
     for column in anode_columns:
         df.loc[row_indices, column] = df_immutable.loc[row_indices[anode_ind], column].to_numpy()
@@ -305,16 +305,16 @@ def update_cell_numbers(df: pd.DataFrame, base_sample_id: str, check_NP_ratio: b
         check_NP_ratio (bool, optional): Check the N:P ratio. Defaults to True.
     """
     if check_NP_ratio:
-        df["Actual N:P Ratio"] = (
+        df["N:P Ratio"] = (
             (df["Anode Balancing Capacity (mAh)"] / df["Anode Diameter (mm)"]**2) /
             (df["Cathode Balancing Capacity (mAh)"] / df["Cathode Diameter (mm)"]**2)
         )
-        cell_meets_criteria = ((df["Actual N:P Ratio"] >= df["Minimum N:P Ratio"])
-                                & (df["Actual N:P Ratio"] <= df["Maximum N:P Ratio"]))
+        cell_meets_criteria = ((df["N:P Ratio"] >= df["N:P Ratio Minimum"])
+                                & (df["N:P Ratio"] <= df["N:P Ratio Maximum"]))
         accepted_cell_indices = np.where(cell_meets_criteria)[0]
-        rejected_cell_indices = np.where(~cell_meets_criteria & ~df["Actual N:P Ratio"].isna())[0]
-        average_deviation = np.mean(np.abs(df["Actual N:P Ratio"][accepted_cell_indices]
-                                        - df["Target N:P Ratio"][accepted_cell_indices]))
+        rejected_cell_indices = np.where(~cell_meets_criteria & ~df["N:P Ratio"].isna())[0]
+        average_deviation = np.mean(np.abs(df["N:P Ratio"][accepted_cell_indices]
+                                        - df["N:P Ratio Target"][accepted_cell_indices]))
         print(f"Accepted {len(accepted_cell_indices)} cells "
             f"with average N:P deviation from target: {average_deviation:.4f}\n"
             f"Rejected {len(rejected_cell_indices)} cells.")
@@ -413,9 +413,9 @@ def main() -> None:
 
                 case 6: # Choose automatically
                     # If all ratios are the same, use 2d matching
-                    if (len(df_batch["Target N:P Ratio"].unique()) == 1 &
-                        len(df_batch["Minimum N:P Ratio"].unique()) == 1 &
-                        len(df_batch["Maximum N:P Ratio"].unique()) == 1):
+                    if (len(df_batch["N:P Ratio Target"].unique()) == 1 &
+                        len(df_batch["N:P Ratio Minimum"].unique()) == 1 &
+                        len(df_batch["N:P Ratio Maximum"].unique()) == 1):
                         anode_ind, cathode_ind = cost_matrix_assign(df_batch)
                         ratio_ind = np.arange(n_rows)
                     # Otherwise, try exact matching, if timeout use greedy matching
@@ -442,7 +442,7 @@ def main() -> None:
         df_settings = pd.read_sql("SELECT * FROM Settings_Table", conn)
         base_sample_id = df_settings.loc[df_settings["key"] == "Base Sample ID", "value"].to_numpy()[0]
 
-        # Update the actual N:P ratio, accepted cell numbers and sample ID in the main dataframe
+        # Update the N:P Ratio, accepted cell numbers and sample ID in the main dataframe
         if sorting_method == 0:
             update_cell_numbers(df, base_sample_id, check_NP_ratio=False)
         else:
