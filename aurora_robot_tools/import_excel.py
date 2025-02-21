@@ -12,7 +12,6 @@ Usage:
     It can also be called from the command line.
 """
 
-import os
 import sqlite3
 import sys
 import warnings
