@@ -1,4 +1,4 @@
-""" Copyright © 2024, Empa, Graham Kimbell, Enea Svaluto-Ferro, Ruben Kuhnel, Corsin Battaglia
+"""Copyright © 2024, Empa, Graham Kimbell, Enea Svaluto-Ferro, Ruben Kuhnel, Corsin Battaglia.
 
 Assigns cell numbers to presses.
 
@@ -30,6 +30,8 @@ Usage:
 
 import sqlite3
 import sys
+from tkinter import Tk, messagebox
+
 import numpy as np
 import pandas as pd
 
@@ -37,14 +39,8 @@ DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
 
 RETURN_STEP = 140  # Step number for returned cell in robot recipe
 
-if len(sys.argv) >= 2:
-    link_rack_pos_to_press = bool(sys.argv[1])
-else:
-    link_rack_pos_to_press = True
-if len(sys.argv) >= 3:
-    limit_electrolytes_per_batch = int(sys.argv[2])
-else:
-    limit_electrolytes_per_batch = 0
+link_rack_pos_to_press = bool(sys.argv[1]) if len(sys.argv) >= 2 else True
+limit_electrolytes_per_batch = int(sys.argv[2]) if len(sys.argv) >= 3 else 0
 
 PRESS_TO_RACK = {
     1 : 1,
@@ -61,7 +57,7 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
     df_press = pd.read_sql("SELECT * FROM Press_Table", conn)
 
     # Check where the cell number loaded is 0 and where the error code is 0 for the presses
-    working_press_numbers = np.where((df_press["Error Code"] == 0))[0]+1
+    working_press_numbers = np.where(df_press["Error Code"] == 0)[0]+1
 
     # Find rack positions with cells that are assigned for assembly (Cell Number > 0), have not
     # finished assembly, with no error code, and find their cell numbers and electrolyte positions
@@ -69,21 +65,21 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
         (df["Cell Number"]>0) &
         (df["Last Completed Step"]<RETURN_STEP) &
         (df["Error Code"]==0) &
-        (df["Current Press Number"]==0)
+        (df["Current Press Number"]==0),
         )[0]+1
-    available_cell_numbers = df.loc[available_rack_pos-1, "Cell Number"].values.astype(int)
-    available_electrolytes = df.loc[available_rack_pos-1, "Electrolyte Position"].values.astype(int)
+    available_cell_numbers = df.loc[available_rack_pos-1, "Cell Number"].to_numpy().astype(int)
+    available_electrolytes = df.loc[available_rack_pos-1, "Electrolyte Position"].to_numpy().astype(int)
 
     if link_rack_pos_to_press:
-        print('Using link_rack_pos_to_press')
+        print("Using link_rack_pos_to_press")
     if limit_electrolytes_per_batch:
-        print(f'Limiting electrolytes to {limit_electrolytes_per_batch} per batch')
+        print(f"Limiting electrolytes to {limit_electrolytes_per_batch} per batch")
 
     electrolytes_used = []
-    presses_with_errors = df_press.loc[df_press["Error Code"]!=0, "Press Number"].values
-    presses_already_loaded = df.loc[df["Current Press Number"]>0, "Current Press Number"].values
-    cells_already_loaded = df.loc[df["Current Press Number"]>0, "Cell Number"].values
-    rack_already_loaded = df.loc[df["Current Press Number"]>0, "Rack Position"].values
+    presses_with_errors = df_press.loc[df_press["Error Code"]!=0, "Press Number"].to_numpy()
+    presses_already_loaded = df.loc[df["Current Press Number"]>0, "Current Press Number"].to_numpy()
+    cells_already_loaded = df.loc[df["Current Press Number"]>0, "Cell Number"].to_numpy()
+    rack_already_loaded = df.loc[df["Current Press Number"]>0, "Rack Position"].to_numpy()
     presses_to_load = []
     cells_to_load = []
     rack_to_load = []
@@ -94,7 +90,7 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
 
         # If no more cells available, stop
         if available_cell_numbers.size == 0:
-            print('No more cells available')
+            print("No more cells available")
             break
 
         # If using link_rack_pos_to_press and press has an error code,
@@ -102,11 +98,11 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
         if (press in presses_with_errors) and link_rack_pos_to_press:
             error_mask = (available_rack_pos-1)%6+1 == PRESS_TO_RACK[press]
             if available_cell_numbers[error_mask].size>0:
-                print(f'Press {press} has an error, '
-                        f'giving error code to cells with rack position {available_cell_numbers[error_mask]}')
+                print(f"Press {press} has an error, "
+                        f"giving error code to cells with rack position {available_cell_numbers[error_mask]}")
                 df.loc[available_rack_pos[error_mask]-1, "Error Code"] = 301
             else:
-                print(f'Press {press} has an error')
+                print(f"Press {press} has an error")
             continue
 
         # If press already has a cell loaded
@@ -114,7 +110,8 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
             idxs = df.loc[df["Current Press Number"] == press].index
             error_msg = (f'Press {press} has a cell already loaded.\n'
                       'Check "Current Press Number" column in cell_assembly_table in the database.')
-            assert len(idxs) == 1, error_msg
+            if len(idxs) != 1:
+                raise ValueError(error_msg)
             # If there is no error, add the electrolyte to the list of used electrolytes
             if df["Error Code"].loc[idxs[0]] == 0:
                 electrolyte = df["Electrolyte Position"].loc[idxs[0]]
@@ -126,9 +123,8 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
             availability_mask = (available_rack_pos-1)%6+1 == PRESS_TO_RACK[press]
 
         # Only allow limit_electrolytes_per_batch different electrolytes to be loaded at once (if > 0)
-        if limit_electrolytes_per_batch:
-            if len(set(electrolytes_used)) >= limit_electrolytes_per_batch:
-                availability_mask &= [electrolyte in electrolytes_used for electrolyte in available_electrolytes]
+        if limit_electrolytes_per_batch and len(set(electrolytes_used)) >= limit_electrolytes_per_batch:
+            availability_mask &= [electrolyte in electrolytes_used for electrolyte in available_electrolytes]
 
         # Assign the first available cell to the press
         final_available_cell_numbers = available_cell_numbers[availability_mask]
@@ -148,38 +144,35 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
             available_rack_pos = np.delete(available_rack_pos, removed_idx)
             available_electrolytes = np.delete(available_electrolytes, removed_idx)
         else:
-            print(f'Press {press} has no available cells to load')
+            print(f"Press {press} has no available cells to load")
             continue
 
     # If there are cells already loaded into presses and new cells that can be loaded
     # ask the user if they want to start assembling new cells
     if len(presses_already_loaded) > 0 and len(cells_to_load) > 0:
-        from tkinter import messagebox, Tk
         root = Tk()
         root.withdraw()
-
         load_new_cells = messagebox.askyesno(
             title="Cells already loaded",
             message=
             "Some cells are already loaded into presses:\n\nPress | Rack | Cell\n"
-            + ''.join([f"{p:<10} {r:<9} {c:<9}\n" for p, r, c in
+            + "".join([f"{p:<10} {r:<9} {c:<9}\n" for p, r, c in
                        zip(presses_already_loaded,rack_already_loaded,cells_already_loaded)]) +
             "\nDo you also want to load new cells?\n\nPress | Rack | Cell\n"
-            + ''.join([f"{p:<10} {r:<9} {c:<9}\n" for p, r, c in
-                       zip(presses_to_load, rack_to_load, cells_to_load)])
+            + "".join([f"{p:<10} {r:<9} {c:<9}\n" for p, r, c in
+                       zip(presses_to_load, rack_to_load, cells_to_load)]),
         )
     else:
         load_new_cells=True
 
     # Write the updated tables back to the database
     if load_new_cells and len(cells_to_load) > 0:
-        print("Loading:\n"+
-              "Press | Rack | Cell\n"+
-              ''.join([f"{p:<7} {r:<6} {c:<6}\n" for p, r, c in zip(presses_to_load, rack_to_load, cells_to_load)]))
+        print("Loading:\n"+"Press | Rack | Cell\n"+
+              "".join([f"{p:<7} {r:<6} {c:<6}\n" for p, r, c in zip(presses_to_load, rack_to_load, cells_to_load)]))
         df_press.to_sql("Press_Table", conn, index=False, if_exists="replace")
         df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace")
-        print('Successfully updated the database')
+        print("Successfully updated the database")
     elif len(cells_to_load) == 0:
-        print('No cells available to load')
+        print("No cells available to load")
     else:
-        print('Not loading new cells - finishing current assembly first')
+        print("Not loading new cells - finishing current assembly first")
