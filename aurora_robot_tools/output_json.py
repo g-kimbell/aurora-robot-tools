@@ -112,7 +112,7 @@ def _generate_assembly_history(timestamps: pd.Series) -> list:
             step["uts"] = int(dt.timestamp())
             history.append(step)
     return history
-print(df_timestamp)
+
 df_timestamp["Assembly History"] = df_timestamp.apply(_generate_assembly_history, axis=1)
 
 # Merge assembly history into the cell assembly table on cell number
