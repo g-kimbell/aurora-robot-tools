@@ -9,6 +9,7 @@ from tkinter import Tk, filedialog
 
 import pandas as pd
 import pytz
+from step_definition import step_definition
 
 DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
 
@@ -16,66 +17,7 @@ TIME_ZONE = "Europe/Zurich"
 
 DEFAULT_OUTPUT_FILEPATH = "%userprofile%\\Desktop\\Outputs"
 
-STEP_DEFINITION = {
-    10: {
-        "Step": "Bottom",
-        "Description": "Place bottom casing",
-    },
-    20: {
-        "Step": "Spacer",
-        "Description": "Place bottom spacer",
-    },
-    30: {
-        "Step": "Anode",
-        "Description": "Place anode face up",
-    },
-    40: {
-        "Step": "Cathode",
-        "Description": "Place cathode face up",
-    },
-    50: {
-        "Step": "Electrolyte",
-        "Description": "Add electrolyte before separator",
-    },
-    60: {
-        "Step": "Separator",
-        "Description": "Place separator",
-    },
-    70: {
-        "Step": "Electrolyte",
-        "Description": "Add electrolyte after separator",
-    },
-    80: {
-        "Step": "Anode",
-        "Description": "Place anode face down",
-    },
-    90: {
-        "Step": "Cathode",
-        "Description": "Place cathode face down",
-    },
-    100: {
-        "Step": "Spacer",
-        "Description": "Place top spacer",
-    },
-    110: {
-        "Step": "Spring",
-        "Description": "Place spring",
-    },
-    120: {
-        "Step": "Top",
-        "Description": "Place top casing",
-    },
-    130: {
-        "Step": "Press",
-        "Description": "Press cell using 7.8 kN hydraulic press",
-    },
-    140: {
-        "Step": "Return",
-        "Description": "Return completed cell to rack",
-    },
-}
-
-PRESS_STEP = next(k for k, v in STEP_DEFINITION.items() if v["Step"] == "Press")
+press_step = next(k for k, v in step_definition.items() if v["Step"] == "Press")
 
 # Get Run ID from the settings table
 with sqlite3.connect(DATABASE_FILEPATH) as conn:
@@ -100,7 +42,7 @@ if not output_filepath.endswith(".json"):
 with sqlite3.connect(DATABASE_FILEPATH) as conn:
     # Get cell assembly table for finished cells
     df = pd.read_sql(
-        f"SELECT * FROM Cell_Assembly_Table WHERE `Last Completed Step` >= {PRESS_STEP} AND `Error Code` = 0",
+        f"SELECT * FROM Cell_Assembly_Table WHERE `Last Completed Step` >= {press_step} AND `Error Code` = 0",
         conn,
     )
     df_timestamp = pd.read_sql(
@@ -151,7 +93,7 @@ def _generate_assembly_history(timestamps: pd.Series) -> list:
     """Take a row of timestamps, turn into a list of dicts describing assembly history."""
     history = []
     timestamp_dict = timestamps.to_dict()
-    for i in STEP_DEFINITION:
+    for i in step_definition:
         # check if key exists
         step: dict[str,str|int] = {}
         ts = timestamp_dict.get(i)
@@ -164,8 +106,8 @@ def _generate_assembly_history(timestamps: pd.Series) -> list:
                 except ValueError:
                     dt = datetime.strptime(ts, "%d.%m.%Y %H:%M")  # noqa: DTZ007
             dt = pytz.timezone(TIME_ZONE).localize(dt)
-            step["Step"] = STEP_DEFINITION[i]["Step"]
-            step["Description"] = STEP_DEFINITION[i]["Description"]
+            step["Step"] = step_definition[i]["Step"]
+            step["Description"] = step_definition[i]["Description"]
             step["Timestamp"] = dt.strftime("%Y-%m-%d %H:%M:%S %z")
             step["uts"] = int(dt.timestamp())
             history.append(step)
