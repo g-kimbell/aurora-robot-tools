@@ -1,7 +1,9 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/a0de8809-3ea8-42d5-abc4-049c9d8e3e61" width="500" align="center" alt="Aurora robot tools">
+  <img src="https://github.com/user-attachments/assets/cf12bd10-4fd1-459d-9427-c5c1ff778266#gh-light-mode-only" width="500" align="center" alt="Aurora cycler manager">
+  <img src="https://github.com/user-attachments/assets/40be68c8-9de0-42cb-9be4-8388fe5965a0#gh-dark-mode-only" width="500" align="center" alt="Aurora cycler manager">
 </p>
-</br>
+
+<br>
 
 Scripts to enhance the functionality of the Aurora battery assembly robot at Empa, based on the Chemspeed Swing SP system.
 
