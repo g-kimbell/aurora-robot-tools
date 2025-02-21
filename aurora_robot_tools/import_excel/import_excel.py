@@ -43,9 +43,13 @@ if input_filepath:
     print(f"Reading {input_filepath}")
 
     # Read the excel file
-    df = pd.read_excel(input_filepath, sheet_name="Input Table", dtype={"Casing Type": str})
-    df_electrodes = pd.read_excel(input_filepath, sheet_name="Electrode Properties")
-    df_electrolyte = pd.read_excel(input_filepath, sheet_name="Electrolyte Properties", skiprows=1)
+    try:
+        df = pd.read_excel(input_filepath, sheet_name="Input Table")
+        df_components = pd.read_excel(input_filepath, sheet_name="Component Properties")
+        df_electrolyte = pd.read_excel(input_filepath, sheet_name="Electrolyte Properties", skiprows=1)
+    except ValueError:
+        print("CRITICAL: Excel file format not correct. Check your input file and try again.")
+        raise
 
     # Create the empty Press_Table
     df_press = pd.DataFrame()
@@ -65,10 +69,10 @@ if input_filepath:
 
     # Fill the details for electrolyte properties
     df["Electrolyte Name"] = df["Electrolyte Position"].map(
-        df_electrolyte.set_index("Electrolyte Position")["Name"]
+        df_electrolyte.set_index("Electrolyte Position")["Name"],
     )
     df["Electrolyte Description"] = df["Electrolyte Position"].map(
-        df_electrolyte.set_index("Electrolyte Position")["Description"]
+        df_electrolyte.set_index("Electrolyte Position")["Description"],
     )
     df["Electrolyte Amount Before Separator (uL)"] = df["Electrolyte Amount (uL)"] * (
         (df["Electrolyte Dispense Order"]=="Before") + 0.5*(df["Electrolyte Dispense Order"]=="Both")
@@ -79,13 +83,13 @@ if input_filepath:
 
     # Fill the details for electrode properties
     # df_anode is df_electrodes where 'anode' is in the column name
-    df_anode = df_electrodes[[col for col in df_electrodes.columns if "Anode" in col]]
+    df_anode = df_components[[col for col in df_components.columns if "Anode" in col]]
     df_anode = df_anode.dropna(subset=["Anode Type"])
     # if diameter is missing or 0, set to 15 mm
     df_anode["Anode Diameter (mm)"] = df_anode["Anode Diameter (mm)"].fillna(15).replace(0, 15)
 
     # df_cathode is df_electrodes where 'cathode' is in the column name
-    df_cathode = df_electrodes[[col for col in df_electrodes.columns if "Cathode" in col]]
+    df_cathode = df_components[[col for col in df_components.columns if "Cathode" in col]]
     df_cathode = df_cathode.dropna(subset=["Cathode Type"])
     # if diameter is missing or 0, set to 14 mm
     df_cathode["Cathode Diameter (mm)"] = df_cathode["Cathode Diameter (mm)"].fillna(14).replace(0, 14)
@@ -98,9 +102,24 @@ if input_filepath:
         )
         sys.exit(1)
 
-    # Merge with input table on Anode Type and Cathode Type
+    # Merge Anode and Cathode into table
     df = df.merge(df_anode, on="Anode Type", how="left")
     df = df.merge(df_cathode, on="Cathode Type", how="left")
+
+    # Merge separator into table
+    df_separator = df_components[[col for col in df_components.columns if "Separator" in col]]
+    df = df.merge(df_separator, on="Separator Type", how="left")
+
+    # Merge casing into table
+    df_casing = df_components[[col for col in df_components.columns if "Casing" in col]]
+    df = df.merge(df_casing, on="Casing Type", how="left")
+
+    # Merge spacer into table
+    df_spacer = df_components[[col for col in df_components.columns if "Spacer" in col]]
+    for spacer_pos in ["Top", "Bottom"]:
+        df_spacer_specific = df_spacer.rename(columns={col: f"{spacer_pos} {col}" for col in df_spacer.columns})
+        df = df.merge(df_spacer_specific, on=f"{spacer_pos} Spacer Type", how="left")
+        df[f"{spacer_pos} Spacer Thickness (mm)"] = df[f"{spacer_pos} Spacer Thickness (mm)"].fillna(0)
 
     # Add columns which will be filled in later
     df["Anode Weight (mg)"] = 0
@@ -112,7 +131,7 @@ if input_filepath:
     df["Cathode Balancing Capacity (mAh)"] = 0
     df["Cathode Rack Position"] = 0
     df["N:P ratio overlap factor"] = 0
-    df["Actual N:P Ratio"] = 0
+    df["N:P Ratio"] = 0
     df["Cell Number"] = 0
     df["Last Completed Step"] = 0
     df["Current Press Number"] = 0
@@ -126,6 +145,20 @@ if input_filepath:
     df.loc[df["Anode Type"].notna(), "Anode Weight (mg)"] = 0
     df.loc[df["Cathode Type"].notna(), "Cathode Weight (mg)"] = 0
 
+    # Set the first few columns, the rest in alphabetical order
+    columns = df.columns.tolist()
+    first_cols = [
+        "Rack Position",
+        "Cell Number",
+        "Current Press Number",
+        "Last Completed Step",
+        "Error Code",
+        "Comments",
+    ]
+    for f in first_cols:
+        columns.remove(f)
+    columns = first_cols + sorted(columns)
+    df = df[columns]
     print("Successfully read and manipulated the Excel file.")
 
     # Warnings to the user
@@ -138,10 +171,10 @@ if input_filepath:
         "Cathode Balancing Specific Capacity (mAh/g)",
         "Cathode C-rate Definition Specific Capacity (mAh/g)",
         "Cathode C-rate Definition Areal Capacity (mAh/cm2)",
-        "Target N:P Ratio",
-        "Minimum N:P Ratio",
-        "Maximum N:P Ratio",
-        "Separator",
+        "N:P Ratio Target",
+        "N:P Ratio Minimum",
+        "N:P Ratio Maximum",
+        "Separator Type",
         "Electrolyte Position",
         "Electrolyte Amount (uL)",
         "Electrolyte Dispense Order",
@@ -165,8 +198,6 @@ if input_filepath:
         )
     elif (df["Electrolyte Amount (uL)"]>150).any():
         print(f'WARNING: your input has large electrolyte volumes up {max(df["Electrolyte Amount (uL)"])} uL.')
-    if (~df["Separator"].loc[used_rows].isin(["Whatman","Celgard"])).any():
-        print("WARNING: separator type not recognised. Check the input file.")
     if (df["Rack Position"] != pd.Series(range(1, 37))).any():
         exit_code=1
         print("CRITICAL: rack positions must be sequential 1-36. Check the input file.")
