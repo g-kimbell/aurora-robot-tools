@@ -10,6 +10,12 @@ def import_excel() -> None:
     import_excel_main()
 
 @app.command()
+def electrolyte(safety_factor: float = Argument(1.1)) -> None:
+    """Determine electrolyte mixing steps."""
+    from aurora_robot_tools.electrolyte_calculation import main as electrolyte_main
+    electrolyte_main(safety_factor)
+
+@app.command()
 def backup() -> None:
     """Backup the robot database."""
     from aurora_robot_tools.backup_database import main as backup_main
