@@ -25,7 +25,7 @@ def balance(mode: int = Argument(6)) -> None:
     balance_main(mode)
 
 @app.command()
-def assign(link: bool = True, elyte_limit: int = 0) -> None:
+def assign(link: bool = Argument(True), elyte_limit: int = Argument(0)) -> None:  # noqa: FBT003
     """Assign cells to presses."""
     assign_main(link, elyte_limit)
 
