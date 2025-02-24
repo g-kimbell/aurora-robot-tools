@@ -1,19 +1,16 @@
-"""Copyright © 2024, Empa, Graham Kimbell, Enea Svaluto-Ferro, Ruben Kuhnel, Corsin Battaglia.
+"""Copyright © 2025, Empa, Graham Kimbell, Enea Svaluto-Ferro, Ruben Kuhnel, Corsin Battaglia.
 
 Read the user input Excel file and write the data to a SQL database.
 
-Users should use the prepared Excel file, "Input with electrode table.xlsx", to input all of the
-parameters of the cells to be assembled. The script reads the file, does some simple manipulation,
-and writes the data to the "Cell_Assembly_Table" in the chemspeedDB database, which is used by the
-AutoSuite software to assemble the cells.
+Users should use the prepared Excel template to input all of the parameters of the cells to be
+assembled. The script reads the file, manipulates, and writes to the Chemspeed database which is
+used by the AutoSuite software to assemble the cells.
 
 Usage:
-    The script is called from import_excel.exe by the AutoSuite software.
-    It can also be called from the command line.
+    Run file directly, use the CLI, or call from Autosuite software.
 """
 
 import sqlite3
-import sys
 import warnings
 from pathlib import Path
 from tkinter import Tk, filedialog
@@ -24,27 +21,29 @@ import pandas as pd
 warnings.filterwarnings("ignore", ".*extension is not supported and will be removed.*")
 
 DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
-
-# Open dialog to select the input file
 DEFAULT_INPUT_FILEPATH = "%userprofile%\\Desktop\\Inputs"
-Tk().withdraw()  # to hide the main window
-input_filepath = Path(
-    filedialog.askopenfilename(
-        initialdir = DEFAULT_INPUT_FILEPATH,
-        title = "Select the input Excel file",
-        filetypes = [("Excel files", "*.xlsx")],
-    ),
-)
 
-exit_code=0
+def get_input(default: str) -> Path:
+    """Open a dialog to select the input file."""
+    Tk().withdraw()  # to hide the main window
+    file_path = Path(
+        filedialog.askopenfilename(
+            initialdir = default,
+            title = "Select the input Excel file",
+            filetypes = [("Excel files", "*.xlsx")],
+        ),
+    )
+    # check if it is a valid excel file
+    if not file_path.exists():
+        msg = "No file selected."
+        raise ValueError(msg)
+    if file_path.suffix != ".xlsx":
+        msg = "Selected file is not a .xlsx file."
+        raise ValueError(msg)
+    return file_path
 
-if not input_filepath:
-    print("No input file selected - not updating the database.")
-
-if input_filepath:
-    print(f"Reading {input_filepath}")
-
-    # Read the excel file
+def read_excel(input_filepath: Path) -> tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
+    """Read excel file, return as main, component and electrolyte dataframes."""
     try:
         df = pd.read_excel(input_filepath, sheet_name="Input Table")
         df_components = pd.read_excel(input_filepath, sheet_name="Component Properties")
@@ -52,23 +51,26 @@ if input_filepath:
     except ValueError:
         print("CRITICAL: Excel file format not correct. Check your input file and try again.")
         raise
+    return df, df_components, df_electrolyte
 
-    # Create the empty Press_Table
+def create_aux_tables(input_filepath: Path) -> pd.DataFrame:
+    """Create the press, settings and timestamp tables."""
     df_press = pd.DataFrame()
     df_press["Press Number"] = [1, 2, 3, 4, 5, 6]
     df_press["Current Cell Number Loaded"] = 0
     df_press["Error Code"] = 0
     df_press["Last Completed Step"] = 0
 
-    # Create the settings table
     df_settings = pd.DataFrame()
     df_settings["key"] = ["Input Filepath","Base Sample ID"]
     df_settings["value"] = [str(input_filepath),str(input_filepath.stem)]
 
-    # Create the timestamp table
     df_timestamp = pd.DataFrame(columns = ["Cell Number","Step Number","Timestamp"])
 
-    # Fill the details for electrolyte properties
+    return df_press, df_settings, df_timestamp
+
+def merge_electrolyte(df: pd.DataFrame, df_electrolyte: pd.DataFrame) -> pd.DataFrame:
+    """Merge electrolyte details into the main dataframe based on electrolyte position."""
     df["Electrolyte Name"] = df["Electrolyte Position"].map(
         df_electrolyte.set_index("Electrolyte Position")["Name"],
     )
@@ -81,8 +83,10 @@ if input_filepath:
     df["Electrolyte Amount After Separator (uL)"] = df["Electrolyte Amount (uL)"] * (
         (df["Electrolyte Dispense Order"]=="After") + 0.5*(df["Electrolyte Dispense Order"]=="Both")
     )
+    return df
 
-    # Fill the details for electrode properties
+def merge_electrodes(df: pd.DataFrame, df_components: pd.DataFrame) -> pd.DataFrame:
+    """Merge electrode details into the main dataframe based on electrode type."""
     # df_anode is df_electrodes where 'anode' is in the column name
     df_anode = df_components[[col for col in df_components.columns if "Anode" in col]]
     df_anode = df_anode.dropna(subset=["Anode Type"])
@@ -97,16 +101,19 @@ if input_filepath:
 
     # If Anode Type or Cathode Type contains duplicates, raise an error
     if df_anode["Anode Type"].duplicated().any() or df_cathode["Cathode Type"].duplicated().any():
-        print(
+        msg = (
             "CRITICAL: Anode Type or Cathode Type in electrode properties table contains "
             "duplicates. Check the input file.",
         )
-        sys.exit(1)
+        raise ValueError(msg)
 
     # Merge Anode and Cathode into table
     df = df.merge(df_anode, on="Anode Type", how="left")
     df = df.merge(df_cathode, on="Cathode Type", how="left")
+    return df
 
+def merge_other_components(df: pd.DataFrame, df_components: pd.DataFrame) -> pd.DataFrame:
+    """Merge in details of separator, casing, and spacer."""
     # Merge separator into table
     df_separator = df_components[[col for col in df_components.columns if "Separator" in col]]
     df = df.merge(df_separator, on="Separator Type", how="left")
@@ -121,8 +128,10 @@ if input_filepath:
         df_spacer_specific = df_spacer.rename(columns={col: f"{spacer_pos} {col}" for col in df_spacer.columns})
         df = df.merge(df_spacer_specific, on=f"{spacer_pos} Spacer Type", how="left")
         df[f"{spacer_pos} Spacer Thickness (mm)"] = df[f"{spacer_pos} Spacer Thickness (mm)"].fillna(0)
+    return df
 
-    # Add columns which will be filled in later
+def add_extra_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Add columns which will be filled in by the robot later."""
     df["Anode Mass (mg)"] = 0
     df["Anode Active Material Mass (mg)"] = 0
     df["Anode Balancing Capacity (mAh)"] = 0
@@ -146,7 +155,10 @@ if input_filepath:
     df.loc[df["Anode Type"].notna(), "Anode Mass (mg)"] = 0
     df.loc[df["Cathode Type"].notna(), "Cathode Mass (mg)"] = 0
 
-    # Set the first few columns, the rest in alphabetical order
+    return df
+
+def reorder_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Re-order columns in database, put frequently used at start, otherwise alphabetical."""
     columns = df.columns.tolist()
     first_cols = [
         "Rack Position",
@@ -159,9 +171,10 @@ if input_filepath:
     for f in first_cols:
         columns.remove(f)
     columns = first_cols + sorted(columns)
-    df = df[columns]
-    print("Successfully read and manipulated the Excel file.")
+    return df
 
+def sanity_check(df: pd.DataFrame) -> None:
+    """Check columns are present and have sensible values."""
     # Warnings to the user
     columns_to_check = [
         "Anode Type",
@@ -183,32 +196,35 @@ if input_filepath:
     ]
     missing_columns = set(columns_to_check) - set(df.columns)
     if missing_columns:
-        exit_code=1
-        print("CRITICAL: these columns are missing from the input:", missing_columns)
+        msg = f"CRITICAL: these columns are missing from the input: {', '.join(missing_columns)}"
+        raise ValueError(msg)
 
     used_rows = df["Anode Type"].notna() | df["Cathode Type"].notna()
-
     if (~df["Electrolyte Dispense Order"].loc[used_rows].isin(["Before", "After", "Both"])).any():
-        exit_code=1
-        print('CRITICAL: electrolyte dispense order must be "Before", "After" or "Both".')
+        msg = "CRITICAL: electrolyte dispense order must be 'Before', 'After' or 'Both'."
+        raise ValueError(msg)
+
     if (df["Electrolyte Amount (uL)"]>500).any():
-        exit_code=1
-        print(
-            "CRITICAL: your input has electrolyte volumes "
-            f"({max(df["Electrolyte Amount (uL)"])} uL) that are too large.",
-        )
-    elif (df["Electrolyte Amount (uL)"]>150).any():
+        msg = f"Your input has electrolyte volumes that are too large: {max(df['Electrolyte Amount (uL)'])} uL."
+        raise ValueError(msg)
+
+    if (df["Electrolyte Amount (uL)"]>150).any():
         print(f'WARNING: your input has large electrolyte volumes up {max(df["Electrolyte Amount (uL)"])} uL.')
+
     if (df["Rack Position"] != pd.Series(range(1, 37))).any():
-        exit_code=1
-        print("CRITICAL: rack positions must be sequential 1-36. Check the input file.")
+        msg = "Rack positions must be sequential 1-36. Check the input file."
+        raise ValueError(msg)
 
-    if exit_code:
-        print("Critical problems: did not update database.")
-        sys.exit(1)
-
-    # Connect to the database and create the Cell_Assembly_Table
-    with sqlite3.connect(DATABASE_FILEPATH) as conn:
+def write_to_sql(
+        db_path: Path,
+        df: pd.DataFrame,
+        df_press: pd.DataFrame,
+        df_electrolyte: pd.DataFrame,
+        df_settings: pd.DataFrame,
+        df_timestamp: pd.DataFrame,
+    ) -> None:
+    """Write the dataframes to an SQLite3 database to be used by the robot."""
+    with sqlite3.connect(db_path) as conn:
         df.to_sql(
             "Cell_Assembly_Table",
             conn,
@@ -263,4 +279,20 @@ if input_filepath:
             },
         )
 
+def main() -> None:
+    """Read in excel input, manipulate, and write to sql database."""
+    input_filepath = get_input(DEFAULT_INPUT_FILEPATH)
+    df, df_components, df_electrolyte = read_excel(input_filepath)
+    df_press, df_settings, df_timestamp = create_aux_tables(input_filepath)
+    df = merge_electrolyte(df, df_electrolyte)
+    df = merge_electrodes(df, df_components)
+    df = merge_other_components(df, df_components)
+    df = add_extra_columns(df)
+    df = reorder_df(df)
+    print("Successfully read and manipulated the Excel file.")
+    sanity_check(df)
+    write_to_sql(Path(DATABASE_FILEPATH), df, df_press, df_electrolyte, df_settings, df_timestamp)
     print("Successfully updated the database.")
+
+if __name__ == "__main__":
+    main()
