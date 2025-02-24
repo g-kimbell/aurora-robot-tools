@@ -2,7 +2,7 @@
 from typer import Typer
 
 from aurora_robot_tools.import_excel import main as import_excel_main
-
+from aurora_robot_tools.assign_cells_to_press import main as assign_main
 app = Typer()
 
 @app.command()
@@ -22,9 +22,9 @@ def balance(mode: int) -> None:
     raise NotImplementedError
 
 @app.command()
-def assign() -> None:
+def assign(link: bool = True, elyte_limit: int = 0) -> None:
     """Assign cells to presses."""
-    raise NotImplementedError
+    assign_main(link, elyte_limit)
 
 @app.command()
 def photo(step_number: int) -> None:

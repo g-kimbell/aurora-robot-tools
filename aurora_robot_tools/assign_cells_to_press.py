@@ -1,4 +1,4 @@
-"""Copyright © 2024, Empa, Graham Kimbell, Enea Svaluto-Ferro, Ruben Kuhnel, Corsin Battaglia.
+"""Copyright © 2025, Empa, Graham Kimbell, Enea Svaluto-Ferro, Ruben Kuhnel, Corsin Battaglia.
 
 Assigns cell numbers to presses.
 
@@ -39,9 +39,6 @@ DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
 
 RETURN_STEP = 140  # Step number for returned cell in robot recipe
 
-link_rack_pos_to_press = bool(sys.argv[1]) if len(sys.argv) >= 2 else True
-limit_electrolytes_per_batch = int(sys.argv[2]) if len(sys.argv) >= 3 else 0
-
 PRESS_TO_RACK = {
     1 : 1,
     2 : 4,
@@ -51,10 +48,18 @@ PRESS_TO_RACK = {
     6 : 6,
 }
 
-with sqlite3.connect(DATABASE_FILEPATH) as conn:
-    # Read the table Cell_Assembly_Table and Press_Table from the database
-    df = pd.read_sql("SELECT * FROM Cell_Assembly_Table", conn)
-    df_press = pd.read_sql("SELECT * FROM Press_Table", conn)
+def main(link_rack_pos_to_press: bool, limit_electrolytes_per_batch: int) -> None:
+    """Assign cells to pressing tools.
+
+    Args:
+        link_rack_pos_to_press: Whether to only assign certain rack positions to certain pressing tools
+        limit_electrolytes_per_batch: The maximum number of different electrolytes to assign to a batch
+
+    """
+    # Read the Cell_Assembly_Table and Press_Table tables from the database.
+    with sqlite3.connect(DATABASE_FILEPATH) as conn:
+        df = pd.read_sql("SELECT * FROM Cell_Assembly_Table", conn)
+        df_press = pd.read_sql("SELECT * FROM Press_Table", conn)
 
     # Check where the cell number loaded is 0 and where the error code is 0 for the presses
     working_press_numbers = np.where(df_press["Error Code"] == 0)[0]+1
@@ -71,7 +76,7 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
     available_electrolytes = df.loc[available_rack_pos-1, "Electrolyte Position"].to_numpy().astype(int)
 
     if link_rack_pos_to_press:
-        print("Using link_rack_pos_to_press")
+        print(f"Limited to press:cell pairs {", ".join([str(k)+":"+str(v)+"+6x" for k,v in PRESS_TO_RACK.items()])}")
     if limit_electrolytes_per_batch:
         print(f"Limiting electrolytes to {limit_electrolytes_per_batch} per batch")
 
@@ -109,7 +114,7 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
         if press in presses_already_loaded:
             idxs = df.loc[df["Current Press Number"] == press].index
             error_msg = (f'Press {press} has a cell already loaded.\n'
-                      'Check "Current Press Number" column in cell_assembly_table in the database.')
+                    'Check "Current Press Number" column in cell_assembly_table in the database.')
             if len(idxs) != 1:
                 raise ValueError(error_msg)
             # If there is no error, add the electrolyte to the list of used electrolytes
@@ -147,32 +152,38 @@ with sqlite3.connect(DATABASE_FILEPATH) as conn:
             print(f"Press {press} has no available cells to load")
             continue
 
-    # If there are cells already loaded into presses and new cells that can be loaded
-    # ask the user if they want to start assembling new cells
-    if len(presses_already_loaded) > 0 and len(cells_to_load) > 0:
-        root = Tk()
-        root.withdraw()
-        load_new_cells = messagebox.askyesno(
-            title="Cells already loaded",
-            message=
-            "Some cells are already loaded into presses:\n\nPress | Rack | Cell\n"
-            + "".join([f"{p:<10} {r:<9} {c:<9}\n" for p, r, c in
-                       zip(presses_already_loaded,rack_already_loaded,cells_already_loaded)]) +
-            "\nDo you also want to load new cells?\n\nPress | Rack | Cell\n"
-            + "".join([f"{p:<10} {r:<9} {c:<9}\n" for p, r, c in
-                       zip(presses_to_load, rack_to_load, cells_to_load)]),
-        )
-    else:
-        load_new_cells=True
+        # If there are cells already loaded into presses and new cells that can be loaded
+        # ask the user if they want to start assembling new cells
+        if len(presses_already_loaded) > 0 and len(cells_to_load) > 0:
+            root = Tk()
+            root.withdraw()
+            load_new_cells = messagebox.askyesno(
+                title="Cells already loaded",
+                message=
+                "Some cells are already loaded into presses:\n\nPress | Rack | Cell\n"
+                + "".join([f"{p:<10} {r:<9} {c:<9}\n" for p, r, c in
+                        zip(presses_already_loaded,rack_already_loaded,cells_already_loaded)]) +
+                "\nDo you also want to load new cells?\n\nPress | Rack | Cell\n"
+                + "".join([f"{p:<10} {r:<9} {c:<9}\n" for p, r, c in
+                        zip(presses_to_load, rack_to_load, cells_to_load)]),
+            )
+        else:
+            load_new_cells=True
 
-    # Write the updated tables back to the database
-    if load_new_cells and len(cells_to_load) > 0:
-        print("Loading:\n"+"Press | Rack | Cell\n"+
-              "".join([f"{p:<7} {r:<6} {c:<6}\n" for p, r, c in zip(presses_to_load, rack_to_load, cells_to_load)]))
-        df_press.to_sql("Press_Table", conn, index=False, if_exists="replace")
-        df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace")
-        print("Successfully updated the database")
-    elif len(cells_to_load) == 0:
-        print("No cells available to load")
-    else:
-        print("Not loading new cells - finishing current assembly first")
+        # Write the updated tables back to the database
+        if load_new_cells and len(cells_to_load) > 0:
+            print("Loading:\n"+"Press | Rack | Cell\n"+
+                "".join([f"{p:<7} {r:<6} {c:<6}\n" for p, r, c in zip(presses_to_load, rack_to_load, cells_to_load)]))
+            with sqlite3.connect(DATABASE_FILEPATH) as conn:
+                df_press.to_sql("Press_Table", conn, index=False, if_exists="replace")
+                df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace")
+            print("Successfully updated the database")
+        elif len(cells_to_load) == 0:
+            print("No cells available to load")
+        else:
+            print("Not loading new cells - finishing current assembly first")
+
+if __name__ == "__main__":
+    link = bool(sys.argv[1]) if len(sys.argv) >= 2 else True
+    limit = int(sys.argv[2]) if len(sys.argv) >= 3 else 0
+    main(link,limit)
