@@ -18,6 +18,12 @@ dependencies = [
     "h5py",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "mypy",
+]
+
 [project.scripts]
 aurora-rt = "aurora_robot_tools.cli:app"
 
