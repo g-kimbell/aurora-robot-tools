@@ -7,10 +7,11 @@ import sqlite3
 from pathlib import Path
 from time import sleep
 
-import gxipy as gx
 import h5py
 import numpy as np
 from PIL import Image
+
+import aurora_robot_tools.camera.gxipy as gx
 
 IMAGE_FOLDER = Path("C:/Aurora_images/")
 DATABASE_FILEPATH = Path("C:/Modules/Database/chemspeedDB.db")
