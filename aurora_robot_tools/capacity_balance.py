@@ -333,124 +333,134 @@ def update_cell_numbers(df: pd.DataFrame, base_sample_id: str, check_NP_ratio: b
         df.loc[cell_index, "Sample ID"] = f"{base_sample_id}_{cell_number + 1:02d}"
 
 
-def main() -> None:
+def main(sorting_method: int) -> None:
     """Full function to match cathodes with anodes and update the database.
 
     Read the cell assembly data from the database, calculate the capacity of the anodes and
     cathodes, and match the cathodes with the anodes to achieve the desired N:P ratio. Write the
     updated table back to the database.
-    """
-    sorting_method = int(sys.argv[1]) if len(sys.argv) >= 2 else 6
 
+    Args:
+        sorting_method: The method to use for sorting the electrodes.
+            0 - Do not sort, do not check N:P ratio
+            1 - Do not sort, check N:P ratio
+            2 - Sort by capacity
+            3 - 2D cost matrix
+            4 - Greedy 3D matching
+            5 - Exact 3D matching
+            6 - Choose automatically (default)
+            7 - Reverse sort by capacity
+
+    """
     print(f"Reading from database {DATABASE_FILEPATH}")
     print(f"Using sorting method {sorting_method}")
 
     # Connect to the database and create the Cell_Assembly_Table
     with sqlite3.connect(DATABASE_FILEPATH) as conn:
-        # Read from database and calculate capacity
         df = pd.read_sql("SELECT * FROM Cell_Assembly_Table", conn)
-        calculate_capacity(df)
+        df_settings = pd.read_sql("SELECT * FROM Settings_Table", conn)
+    base_sample_id = df_settings.loc[df_settings["key"] == "Base Sample ID", "value"].to_numpy()[0]
 
-        # Split the dataframe into sub-dataframes for each batch number
-        batch_numbers = df["Batch Number"].unique()
-        batch_numbers = batch_numbers[~np.isnan(batch_numbers)]
+    calculate_capacity(df)
 
-        for batch_number in batch_numbers:
-            batch_mask = (
-                (df["Batch Number"] == batch_number) &
-                (df["Last Completed Step"] == 0) &
-                (df["Error Code"] == 0) &
-                (df["Anode Balancing Capacity (mAh)"] > 0) &
-                (df["Cathode Balancing Capacity (mAh)"] > 0)
-            )
-            df_batch = df[batch_mask]
-            # if no cells in this batch, skip
-            if len(df_batch) == 0:
-                print(f"Skipping batch number {batch_number} as there are no available cells.")
-                continue
-            row_indices = np.where(batch_mask)[0]
-            n_rows = len(row_indices)
-            n_rows_skipped = sum(df["Batch Number"] == batch_number) - n_rows
-            print(f"Batch number {batch_number} has {n_rows} cells.")
-            if n_rows_skipped:
-                print(f"Ignoring {n_rows_skipped} cells that do not have "
-                      f"Last Completed Step = 0 and Error Code = 0.")
+    # Split the dataframe into sub-dataframes for each batch number
+    batch_numbers = df["Batch Number"].unique()
+    batch_numbers = batch_numbers[~np.isnan(batch_numbers)]
 
-            # Reorder the anode and cathode rack positions based on the sorting method
-            match sorting_method:
-                case 0: # Do not sort, do not check N:P ratio
-                    anode_ind = np.arange(n_rows)
-                    cathode_ind = np.arange(n_rows)
-                    ratio_ind = np.arange(n_rows)
+    for batch_number in batch_numbers:
+        batch_mask = (
+            (df["Batch Number"] == batch_number) &
+            (df["Last Completed Step"] == 0) &
+            (df["Error Code"] == 0) &
+            (df["Anode Balancing Capacity (mAh)"] > 0) &
+            (df["Cathode Balancing Capacity (mAh)"] > 0)
+        )
+        df_batch = df[batch_mask]
+        # if no cells in this batch, skip
+        if len(df_batch) == 0:
+            print(f"Skipping batch number {batch_number} as there are no available cells.")
+            continue
+        row_indices = np.where(batch_mask)[0]
+        n_rows = len(row_indices)
+        n_rows_skipped = sum(df["Batch Number"] == batch_number) - n_rows
+        print(f"Batch number {batch_number} has {n_rows} cells.")
+        if n_rows_skipped:
+            print(f"Ignoring {n_rows_skipped} cells that do not have "
+                    f"Last Completed Step = 0 and Error Code = 0.")
 
-                case 1: # Do not sort
-                    anode_ind = np.arange(n_rows)
-                    cathode_ind = np.arange(n_rows)
-                    ratio_ind = np.arange(n_rows)
+        # Reorder the anode and cathode rack positions based on the sorting method
+        match sorting_method:
+            case 0: # Do not sort, do not check N:P ratio
+                anode_ind = np.arange(n_rows)
+                cathode_ind = np.arange(n_rows)
+                ratio_ind = np.arange(n_rows)
 
-                case 2: # Order by capacity
-                    # I think this is always worse than the cost matrix approach
-                    anode_sort = np.argsort(df_batch["Anode Balancing Capacity (mAh)"])
-                    cathode_sort = np.argsort(df_batch["Cathode Balancing Capacity (mAh)"])
-                    # Ensure that anode positions do not change
-                    anode_ind = np.arange(n_rows)
-                    cathode_ind = cathode_sort.iloc[np.argsort(anode_sort)]
-                    ratio_ind = np.arange(n_rows)
+            case 1: # Do not sort
+                anode_ind = np.arange(n_rows)
+                cathode_ind = np.arange(n_rows)
+                ratio_ind = np.arange(n_rows)
 
-                case 3: # Use cost matrix and linear sum assignment
-                    anode_ind, cathode_ind = cost_matrix_assign(df_batch)
-                    ratio_ind = np.arange(n_rows)
+            case 2: # Order by capacity
+                # I think this is always worse than the cost matrix approach
+                anode_sort = np.argsort(df_batch["Anode Balancing Capacity (mAh)"])
+                cathode_sort = np.argsort(df_batch["Cathode Balancing Capacity (mAh)"])
+                # Ensure that anode positions do not change
+                anode_ind = np.arange(n_rows)
+                cathode_ind = cathode_sort.iloc[np.argsort(anode_sort)]
+                ratio_ind = np.arange(n_rows)
 
-                case 4: # Use greedy 3D matching
+            case 3: # Use cost matrix and linear sum assignment
+                anode_ind, cathode_ind = cost_matrix_assign(df_batch)
+                ratio_ind = np.arange(n_rows)
+
+            case 4: # Use greedy 3D matching
+                anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch)
+
+            case 5: # Use exact 3D matching
+                try:
+                    anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch,exact=True)
+                except ValueError:
+                    print("Exact matching took too long, using greedy matching instead")
                     anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch)
 
-                case 5: # Use exact 3D matching
+            case 6: # Choose automatically
+                # If all ratios are the same, use 2d matching
+                if (len(df_batch["N:P Ratio Target"].unique()) == 1 &
+                    len(df_batch["N:P Ratio Minimum"].unique()) == 1 &
+                    len(df_batch["N:P Ratio Maximum"].unique()) == 1):
+                    anode_ind, cathode_ind = cost_matrix_assign(df_batch)
+                    ratio_ind = np.arange(n_rows)
+                # Otherwise, try exact matching, if timeout use greedy matching
+                else:
                     try:
                         anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch,exact=True)
                     except ValueError:
                         print("Exact matching took too long, using greedy matching instead")
                         anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch)
 
-                case 6: # Choose automatically
-                    # If all ratios are the same, use 2d matching
-                    if (len(df_batch["N:P Ratio Target"].unique()) == 1 &
-                        len(df_batch["N:P Ratio Minimum"].unique()) == 1 &
-                        len(df_batch["N:P Ratio Maximum"].unique()) == 1):
-                        anode_ind, cathode_ind = cost_matrix_assign(df_batch)
-                        ratio_ind = np.arange(n_rows)
-                    # Otherwise, try exact matching, if timeout use greedy matching
-                    else:
-                        try:
-                            anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch,exact=True)
-                        except ValueError:
-                            print("Exact matching took too long, using greedy matching instead")
-                            anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch)
+            case 7: # Reverse order by capacity
+                # maximises N:P spread
+                anode_sort = np.argsort(df_batch["Anode Balancing Capacity (mAh)"])
+                cathode_sort = np.argsort(df_batch["Cathode Balancing Capacity (mAh)"]).iloc[::-1]
+                # Ensure that anode positions do not change
+                anode_ind = np.arange(n_rows)
+                cathode_ind = cathode_sort.iloc[np.argsort(anode_sort)]
+                ratio_ind = np.arange(n_rows)
 
-                case 7: # Reverse order by capacity
-                    # maximises N:P spread
-                    anode_sort = np.argsort(df_batch["Anode Balancing Capacity (mAh)"])
-                    cathode_sort = np.argsort(df_batch["Cathode Balancing Capacity (mAh)"]).iloc[::-1]
-                    # Ensure that anode positions do not change
-                    anode_ind = np.arange(n_rows)
-                    cathode_ind = cathode_sort.iloc[np.argsort(anode_sort)]
-                    ratio_ind = np.arange(n_rows)
+        # Rearrange the electrodes in the main dataframe
+        rearrange_electrode_columns(df, row_indices, anode_ind, cathode_ind, ratio_ind)
 
-            # Rearrange the electrodes in the main dataframe
-            rearrange_electrode_columns(df, row_indices, anode_ind, cathode_ind, ratio_ind)
+    # Update the N:P Ratio, accepted cell numbers and sample ID in the main dataframe
+    if sorting_method == 0:
+        update_cell_numbers(df, base_sample_id, check_NP_ratio=False)
+    else:
+        update_cell_numbers(df, base_sample_id)
 
-        # Read base_sample_id from the settings table
-        df_settings = pd.read_sql("SELECT * FROM Settings_Table", conn)
-        base_sample_id = df_settings.loc[df_settings["key"] == "Base Sample ID", "value"].to_numpy()[0]
-
-        # Update the N:P Ratio, accepted cell numbers and sample ID in the main dataframe
-        if sorting_method == 0:
-            update_cell_numbers(df, base_sample_id, check_NP_ratio=False)
-        else:
-            update_cell_numbers(df, base_sample_id)
-
-        # Write the updated table back to the database
+    # Write the updated table back to the database
+    with sqlite3.connect(DATABASE_FILEPATH) as conn:
         df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace")
-        print("Updated database successfully")
+    print("Updated database successfully")
 
 if __name__ == "__main__":
-    main()
+    sorting_method = int(sys.argv[1]) if len(sys.argv) >= 2 else 6
+    main(sorting_method)

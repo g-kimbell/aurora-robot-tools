@@ -1,8 +1,9 @@
 """Command line interface for robot tools."""
-from typer import Typer
+from typer import Argument, Typer
 
 from aurora_robot_tools.assign_cells_to_press import main as assign_main
 from aurora_robot_tools.backup_database import main as backup_main
+from aurora_robot_tools.capacity_balance import main as balance_main
 from aurora_robot_tools.import_excel import main as import_excel_main
 
 app = Typer()
@@ -18,10 +19,9 @@ def backup() -> None:
     backup_main()
 
 @app.command()
-def balance(mode: int) -> None:
+def balance(mode: int = Argument(6)) -> None:
     """Perform electrode balancing."""
-    print(f"Received mode: {mode}")
-    raise NotImplementedError
+    balance_main(mode)
 
 @app.command()
 def assign(link: bool = True, elyte_limit: int = 0) -> None:
