@@ -171,7 +171,7 @@ def reorder_df(df: pd.DataFrame) -> pd.DataFrame:
     for f in first_cols:
         columns.remove(f)
     columns = first_cols + sorted(columns)
-    return df
+    return df[columns]
 
 def sanity_check(df: pd.DataFrame) -> None:
     """Check columns are present and have sensible values."""
