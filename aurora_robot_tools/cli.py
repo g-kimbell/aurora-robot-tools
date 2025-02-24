@@ -6,6 +6,7 @@ from aurora_robot_tools.backup_database import main as backup_main
 from aurora_robot_tools.capacity_balance import main as balance_main
 from aurora_robot_tools.import_excel import main as import_excel_main
 from aurora_robot_tools.output_json import main as output_main
+from aurora_robot_tools.camera.capture_image import main as photo_main
 
 app = Typer()
 
@@ -30,10 +31,9 @@ def assign(link: bool = Argument(True), elyte_limit: int = Argument(0)) -> None:
     assign_main(link, elyte_limit)
 
 @app.command()
-def photo(step_number: int) -> None:
+def photo() -> None:
     """Save a photo of the pressing tools."""
-    print(f"Received step number {step_number}")
-    raise NotImplementedError
+    photo_main()
 
 @app.command()
 def output() -> None:
