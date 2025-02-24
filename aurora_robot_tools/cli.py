@@ -1,8 +1,10 @@
 """Command line interface for robot tools."""
 from typer import Typer
 
-from aurora_robot_tools.import_excel import main as import_excel_main
 from aurora_robot_tools.assign_cells_to_press import main as assign_main
+from aurora_robot_tools.backup_database import main as backup_main
+from aurora_robot_tools.import_excel import main as import_excel_main
+
 app = Typer()
 
 @app.command()
@@ -13,7 +15,7 @@ def import_excel() -> None:
 @app.command()
 def backup() -> None:
     """Backup the robot database."""
-    raise NotImplementedError
+    backup_main()
 
 @app.command()
 def balance(mode: int) -> None:
