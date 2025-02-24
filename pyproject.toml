@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aurora-robot-tools"
+requires-python = ">=3.9"
+version = "0.2.0"
+dependencies = [
+    "numpy",
+    "pandas",
+    "pytz",
+    "pulp",
+    "scipy",
+    "typer",
+    "openpyxl",
+    "pillow",
+    "h5py",
+]
+
+[project.scripts]
+aurora-rt = "aurora_robot_tools.cli:app"
+
+[tool.ruff]
+line-length = 120
+lint.select = ["ALL"]
+lint.ignore = [
+    "N806",
+    "T201",
+    "FA102",
+    "PD901",
+    "FBT001",
+    "FBT002",
+    "PLR2004",
+    "TD002",
+    "TD003",
+    "D203",
+    "D213",
+    "COM812",
+]
+fix = true
+
+[tool.mypy]
+disable_error_code = ["import-untyped"]
