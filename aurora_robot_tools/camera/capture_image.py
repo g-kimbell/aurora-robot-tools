@@ -23,54 +23,44 @@ def main() -> None:
     dev_num, dev_info_list = device_manager.update_device_list()
     print(f"Number of enumerated devices is {dev_num}")
     if dev_num == 0:
-        print("Number of enumerated devices is 0")
-    cam = device_manager.open_device_by_index(1)
+        msg = "Cannot connect to camera."
+        raise ValueError(msg)
 
-    # set pixel format to 12-bit
-    cam.PixelFormat.set(gx.GxPixelFormatEntry.MONO12)
+    try:
+        cam = device_manager.open_device_by_index(1)  # connect to first camera
+        cam.PixelFormat.set(gx.GxPixelFormatEntry.MONO12)  # 12-bit
+        cam.TriggerMode.set(gx.GxSwitchEntry.OFF)  # continuous trigger
+        cam.AcquisitionMode.set(gx.GxAcquisitionModeEntry.CONTINUOUS)  # continuous acquisition
+        cam.ExposureAuto.set(gx.GxAutoEntry.CONTINUOUS)  # continuous auto exposure
+        cam.stream_on()  # start data acquisition
 
-    # set continuous trigger
-    cam.TriggerMode.set(gx.GxSwitchEntry.OFF)
-
-    # set continuous acquisition
-    cam.AcquisitionMode.set(gx.GxAcquisitionModeEntry.CONTINUOUS)
-
-    # set auto exposure
-    cam.ExposureAuto.set(gx.GxAutoEntry.CONTINUOUS)
-
-    # start data acquisition
-    cam.stream_on()
-
-    # grab images until exposure is stable
-    avg_brightness = 0
-    prev_avg_brightness = 0
-    stable = 0
-    failed = 0
-    for _ in range(500):
-        raw_image = cam.data_stream[0].get_image()
-        if raw_image:
-            numpy_image = raw_image.get_numpy_array()
-            prev_avg_brightness = avg_brightness
-            avg_brightness = np.mean(numpy_image)
-            diff = avg_brightness - prev_avg_brightness
-            if abs(diff) < 50:
-                stable += 1
+        # grab images until exposure is stable
+        avg_brightness = 0
+        prev_avg_brightness = 0
+        stable = 0
+        failed = 0
+        for _ in range(500):
+            raw_image = cam.data_stream[0].get_image()
+            if raw_image:
+                numpy_image = raw_image.get_numpy_array()
+                prev_avg_brightness = avg_brightness
+                avg_brightness = np.mean(numpy_image)
+                diff = avg_brightness - prev_avg_brightness
+                if abs(diff) < 50:
+                    stable += 1
+                else:
+                    stable = 0
+                if stable > 20:
+                    break
             else:
-                stable = 0
-            if stable > 20:
-                break
-        else:
-            print("didn't get anything")
-            failed += 1
-            if failed >= 10:
-                raise ValueError
-            sleep(1)
-
-    # Stop data acquisition
-    cam.stream_off()
-
-    # Close connection
-    cam.close_device()
+                print("didn't get anything")
+                failed += 1
+                if failed >= 10:
+                    raise ValueError
+                sleep(1)
+    finally:
+        cam.stream_off()
+        cam.close_device()
 
     # Save last image
     # Convert 12-bit image to 8-bit for saving as PNG
