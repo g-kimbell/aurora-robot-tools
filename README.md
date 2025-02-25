@@ -5,22 +5,32 @@
 
 <br>
 
-Scripts to enhance the functionality of the Aurora battery assembly robot at Empa, based on the Chemspeed Swing SP system.
+Enhancing the Aurora battery assembly robot at Empa.
 
-These scripts are used within the Chemspeed AutoSuite Editor program to give additional functions beyond what is possible within AutoSuite, such as electrode balancing and data management.
-
-The scripts are written in Python, and interact with a SQL database that is read by the AutoSuite program. AutoSuite cannot run Python files direction, instead one can use a "Run Executable" command which currently only works for .exe files. Go scripts are complied to make simple exes which run Python scripts from the command line with standard input and output. This was used instead of e.g. PyInstaller to reduce the space required and speed up execution.
-
+The Aurora battery assembly robot is based on the Chemspeed Swing SP system. This Python module has a command line interface which can be used within Chemspeed Autosuite Editor to provide additional functions beyond what is possible within AutoSuite, such as electrode balancing and data management.
 
 ## Installation
 
-Clone the repo to your prefered location, and install the requirements in requirements.txt. Ensure that the AutoSuite database location matches those in the scripts.
+Clone and pip install the repo in a Python environment (tested on 3.12).
+```
+git clone https://github.com/empaeconversion/aurora-robot-tools
+cd aurora-robot-tools
+pip install .
+```
 
-To compile the Go scripts, install Go, in the terminal navigate to the script folder, and use the command 'go build <script_name>.go'.
+Ensure that the database location in the `config.py` matches the database location used by Autosuite.
 
 ## Usage
 
-The executables or Python scripts can be run directly from the command line, or use from within AutoSuite Editor,use the "Run Executable" command in the Task View and point it to the .exe file you have compiled.
+### From command line
+You can run from the command line with `aurora-rt`, to see possible functions run
+```
+aurora-rt --help
+```
+
+### From Autosuite
+Find the executable `aurora-rt.exe`, for a virtual environment it will be located in .venv/Scripts.
+Reference this executable from the "Run Executable" command in Autosuite Editor Task View. In the command line arguments give the other arguements required, e.g. `balance` to run electrode balancing. See `aurora-rt --help` for the options available.
 
 ## Contributors
 
