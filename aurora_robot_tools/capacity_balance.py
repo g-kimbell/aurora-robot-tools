@@ -57,7 +57,7 @@ import pandas as pd
 import pulp
 from scipy.optimize import linear_sum_assignment
 
-DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
+from aurora_robot_tools.config import DATABASE_FILEPATH
 
 TIMEOUT_SECONDS = 30
 

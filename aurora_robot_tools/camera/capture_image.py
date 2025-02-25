@@ -4,7 +4,6 @@ Capture an image from the camera and save as png and raw 12-bit numpy array.
 
 """
 import sqlite3
-from pathlib import Path
 from time import sleep
 
 import h5py
@@ -12,9 +11,8 @@ import numpy as np
 from PIL import Image
 
 import aurora_robot_tools.camera.gxipy as gx
+from aurora_robot_tools.config import DATABASE_FILEPATH, IMAGE_DIR
 
-IMAGE_FOLDER = Path("C:/Aurora_images/")
-DATABASE_FILEPATH = Path("C:/Modules/Database/chemspeedDB.db")
 
 def main() -> None:
     """Connect to camera, capture image, and save as png and raw 12-bit numpy array."""
@@ -81,7 +79,7 @@ def main() -> None:
         press_cell_steps = cursor.fetchall()
 
     # Make filename from press/cell/step numbers
-    folderpath = IMAGE_FOLDER/run_id
+    folderpath = IMAGE_DIR/run_id
     folderpath.mkdir(parents=True, exist_ok=True)
     filename = "_".join([f"p{p}c{c}s{s}" for p,c,s in press_cell_steps])
 

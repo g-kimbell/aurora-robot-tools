@@ -11,7 +11,6 @@ Usage:
     The script is called from electrolyte_calculation.exe by the AutoSuite software.
     It can also be called from the command line.
 """
-
 import sqlite3
 import sys
 from pathlib import Path
@@ -19,7 +18,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-DATABASE_FILEPATH = Path("C:\\Modules\\Database\\chemspeedDB.db")
+from aurora_robot_tools.config import DATABASE_FILEPATH
+
 
 def read_db(db_path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Read the Cell_Assembly_Table and Electrolyte_Table from the database."""

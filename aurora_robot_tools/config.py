@@ -1,7 +1,16 @@
-"""Definition of steps in the battery assembly process."""
+"""Common configuration settings for the Aurora robot tools."""
+
+from pathlib import Path
+
+DATABASE_FILEPATH = Path("C:/Modules/Database/chemspeedDB.db")
+DATABASE_BACKUP_DIR = Path("C:/Modules/Database/Backup/")
+TIME_ZONE = "Europe/Zurich"
+INPUT_DIR = Path("%userprofile%/Desktop/Inputs/")
+OUTPUT_DIR = Path("%userprofile%/Desktop/Outputs/")
+IMAGE_DIR = Path("C:/Aurora_images/")
 
 # Current step definitions
-step_definition = {
+STEP_DEFINITION = {
     10: {
         "Step": "Bottom",
         "Description": "Place bottom casing",
@@ -61,7 +70,7 @@ step_definition = {
 }
 
 # Step definitions from robot tools 0.1.x
-step_definition_0_1 = {
+STEP_DEFINITION_0_1 = {
     1: {
         "Step": "Bottom",
         "Description": "Place bottom casing",

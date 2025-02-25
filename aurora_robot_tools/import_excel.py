@@ -9,7 +9,6 @@ used by the AutoSuite software to assemble the cells.
 Usage:
     Run file directly, use the CLI, or call from Autosuite software.
 """
-
 import sqlite3
 import warnings
 from pathlib import Path
@@ -17,11 +16,10 @@ from tkinter import Tk, filedialog
 
 import pandas as pd
 
+from aurora_robot_tools.config import DATABASE_FILEPATH, INPUT_DIR
+
 # Ignore the pandas data validation warning
 warnings.filterwarnings("ignore", ".*extension is not supported and will be removed.*")
-
-DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
-DEFAULT_INPUT_FILEPATH = "%userprofile%\\Desktop\\Inputs"
 
 def get_input(default: str) -> Path:
     """Open a dialog to select the input file."""
@@ -281,7 +279,7 @@ def write_to_sql(
 
 def main() -> None:
     """Read in excel input, manipulate, and write to sql database."""
-    input_filepath = get_input(DEFAULT_INPUT_FILEPATH)
+    input_filepath = get_input(INPUT_DIR)
     df, df_components, df_electrolyte = read_excel(input_filepath)
     df_press, df_settings, df_timestamp = create_aux_tables(input_filepath)
     df = merge_electrolyte(df, df_electrolyte)

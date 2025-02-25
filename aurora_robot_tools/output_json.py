@@ -11,15 +11,9 @@ from tkinter import Tk, filedialog
 import pandas as pd
 import pytz
 
-from aurora_robot_tools.step_definition import step_definition
+from aurora_robot_tools.config import DATABASE_FILEPATH, OUTPUT_DIR, TIME_ZONE, STEP_DEFINITION
 
-DATABASE_FILEPATH = Path("C:\\Modules\\Database\\chemspeedDB.db")
-
-TIME_ZONE = "Europe/Zurich"
-
-DEFAULT_OUTPUT_FILEPATH = Path("%userprofile%\\Desktop\\Outputs")
-
-PRESS_STEP = next(k for k, v in step_definition.items() if v["Step"] == "Press")
+PRESS_STEP = next(k for k, v in STEP_DEFINITION.items() if v["Step"] == "Press")
 
 def read_db(db_path: Path, press_step: int) -> tuple[pd.DataFrame, pd.DataFrame, str]:
     """Read completed cells, timestamps, and run_id from robot database."""
@@ -52,7 +46,7 @@ def user_output_filepath(default_folder: Path, run_id: str) -> Path:
     )
     # check if it is a valid excel file
     if not output_filepath.name:
-        output_filepath = Path(DEFAULT_OUTPUT_FILEPATH) / f"{run_id}.json"
+        output_filepath = Path(OUTPUT_DIR) / f"{run_id}.json"
     if output_filepath.suffix != ".json":
         output_filepath = output_filepath.with_suffix(".json")
     return output_filepath
@@ -61,7 +55,7 @@ def generate_assembly_history(timestamps: pd.Series) -> list:
     """Take a row of timestamps, turn into a list of dicts describing assembly history."""
     history = []
     timestamp_dict = timestamps.to_dict()
-    for i in step_definition:
+    for i in STEP_DEFINITION:
         # check if key exists
         step: dict[str,str|int] = {}
         ts = timestamp_dict.get(i)
@@ -74,8 +68,8 @@ def generate_assembly_history(timestamps: pd.Series) -> list:
                 except ValueError:
                     dt = datetime.strptime(ts, "%d.%m.%Y %H:%M")  # noqa: DTZ007
             dt = pytz.timezone(TIME_ZONE).localize(dt)
-            step["Step"] = step_definition[i]["Step"]
-            step["Description"] = step_definition[i]["Description"]
+            step["Step"] = STEP_DEFINITION[i]["Step"]
+            step["Description"] = STEP_DEFINITION[i]["Description"]
             step["Timestamp"] = dt.strftime("%Y-%m-%d %H:%M:%S %z")
             step["uts"] = int(dt.timestamp())
             history.append(step)
@@ -107,7 +101,7 @@ def main() -> None:
     df, df_timestamp, run_id = read_db(DATABASE_FILEPATH, PRESS_STEP)
 
     # Ask user for output file path
-    output_filepath = user_output_filepath(DEFAULT_OUTPUT_FILEPATH, run_id)
+    output_filepath = user_output_filepath(OUTPUT_DIR, run_id)
 
     # If df is empty (no finished cells), exit
     if df.empty:

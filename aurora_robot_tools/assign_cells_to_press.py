@@ -27,7 +27,6 @@ Usage:
     This will ensure that rack positions and press positions are linked (rack 1 only goes to press 
     1, rack 2 to press 2, etc.) and limit the number of different electrolytes in each batch to 2.
 """
-
 import sqlite3
 import sys
 from tkinter import Tk, messagebox
@@ -35,7 +34,7 @@ from tkinter import Tk, messagebox
 import numpy as np
 import pandas as pd
 
-DATABASE_FILEPATH = "C:\\Modules\\Database\\chemspeedDB.db"
+from aurora_robot_tools.config import DATABASE_FILEPATH
 
 RETURN_STEP = 140  # Step number for returned cell in robot recipe
 
@@ -152,36 +151,36 @@ def main(link_rack_pos_to_press: bool, limit_electrolytes_per_batch: int) -> Non
             print(f"Press {press} has no available cells to load")
             continue
 
-        # If there are cells already loaded into presses and new cells that can be loaded
-        # ask the user if they want to start assembling new cells
-        if len(presses_already_loaded) > 0 and len(cells_to_load) > 0:
-            root = Tk()
-            root.withdraw()
-            load_new_cells = messagebox.askyesno(
-                title="Cells already loaded",
-                message=
-                "Some cells are already loaded into presses:\n\nPress | Rack | Cell\n"
-                + "".join([f"{p:<10} {r:<9} {c:<9}\n" for p, r, c in
-                        zip(presses_already_loaded,rack_already_loaded,cells_already_loaded)]) +
-                "\nDo you also want to load new cells?\n\nPress | Rack | Cell\n"
-                + "".join([f"{p:<10} {r:<9} {c:<9}\n" for p, r, c in
-                        zip(presses_to_load, rack_to_load, cells_to_load)]),
-            )
-        else:
-            load_new_cells=True
+    # If there are cells already loaded into presses and new cells that can be loaded
+    # ask the user if they want to start assembling new cells
+    if len(presses_already_loaded) > 0 and len(cells_to_load) > 0:
+        root = Tk()
+        root.withdraw()
+        load_new_cells = messagebox.askyesno(
+            title="Cells already loaded",
+            message=
+            "Some cells are already loaded into presses:\n\nPress | Rack | Cell\n"
+            + "".join([f"{p:<10} {r:<9} {c:<9}\n" for p, r, c in
+                    zip(presses_already_loaded,rack_already_loaded,cells_already_loaded)]) +
+            "\nDo you also want to load new cells?\n\nPress | Rack | Cell\n"
+            + "".join([f"{p:<10} {r:<9} {c:<9}\n" for p, r, c in
+                    zip(presses_to_load, rack_to_load, cells_to_load)]),
+        )
+    else:
+        load_new_cells=True
 
-        # Write the updated tables back to the database
-        if load_new_cells and len(cells_to_load) > 0:
-            print("Loading:\n"+"Press | Rack | Cell\n"+
-                "".join([f"{p:<7} {r:<6} {c:<6}\n" for p, r, c in zip(presses_to_load, rack_to_load, cells_to_load)]))
-            with sqlite3.connect(DATABASE_FILEPATH) as conn:
-                df_press.to_sql("Press_Table", conn, index=False, if_exists="replace")
-                df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace")
-            print("Successfully updated the database")
-        elif len(cells_to_load) == 0:
-            print("No cells available to load")
-        else:
-            print("Not loading new cells - finishing current assembly first")
+    # Write the updated tables back to the database
+    if load_new_cells and len(cells_to_load) > 0:
+        print("Loading:\n"+"Press | Rack | Cell\n"+
+            "".join([f"{p:<7} {r:<6} {c:<6}\n" for p, r, c in zip(presses_to_load, rack_to_load, cells_to_load)]))
+        with sqlite3.connect(DATABASE_FILEPATH) as conn:
+            df_press.to_sql("Press_Table", conn, index=False, if_exists="replace")
+            df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace")
+        print("Successfully updated the database")
+    elif len(cells_to_load) == 0:
+        print("No cells available to load")
+    else:
+        print("Not loading new cells - finishing current assembly first")
 
 if __name__ == "__main__":
     link = bool(sys.argv[1]) if len(sys.argv) >= 2 else True
