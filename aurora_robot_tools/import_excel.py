@@ -14,6 +14,7 @@ import warnings
 from pathlib import Path
 from tkinter import Tk, filedialog
 
+import numpy as np
 import pandas as pd
 
 from aurora_robot_tools.config import DATABASE_FILEPATH, INPUT_DIR
@@ -21,7 +22,7 @@ from aurora_robot_tools.config import DATABASE_FILEPATH, INPUT_DIR
 # Ignore the pandas data validation warning
 warnings.filterwarnings("ignore", ".*extension is not supported and will be removed.*")
 
-def get_input(default: str) -> Path:
+def get_input(default: str | Path) -> Path:
     """Open a dialog to select the input file."""
     Tk().withdraw()  # to hide the main window
     file_path = Path(
@@ -43,9 +44,20 @@ def get_input(default: str) -> Path:
 def read_excel(input_filepath: Path) -> tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
     """Read excel file, return as main, component and electrolyte dataframes."""
     try:
-        df = pd.read_excel(input_filepath, sheet_name="Input Table")
-        df_components = pd.read_excel(input_filepath, sheet_name="Component Properties")
-        df_electrolyte = pd.read_excel(input_filepath, sheet_name="Electrolyte Properties", skiprows=1)
+        df = pd.read_excel(
+            input_filepath,
+            sheet_name="Input Table",
+            dtype={"Bottom Spacer Type": str, "Top Spacer Type": str},
+        )
+        df_components = pd.read_excel(
+            input_filepath,
+            sheet_name="Component Properties",
+        )
+        df_electrolyte = pd.read_excel(
+            input_filepath,
+            sheet_name="Electrolyte Properties",
+            skiprows=1,
+        )
     except ValueError:
         print("CRITICAL: Excel file format not correct. Check your input file and try again.")
         raise
@@ -75,11 +87,9 @@ def merge_electrolyte(df: pd.DataFrame, df_electrolyte: pd.DataFrame) -> pd.Data
     df["Electrolyte Description"] = df["Electrolyte Position"].map(
         df_electrolyte.set_index("Electrolyte Position")["Description"],
     )
-    df["Electrolyte Amount Before Separator (uL)"] = df["Electrolyte Amount (uL)"] * (
-        (df["Electrolyte Dispense Order"]=="Before") + 0.5*(df["Electrolyte Dispense Order"]=="Both")
-    )
-    df["Electrolyte Amount After Separator (uL)"] = df["Electrolyte Amount (uL)"] * (
-        (df["Electrolyte Dispense Order"]=="After") + 0.5*(df["Electrolyte Dispense Order"]=="Both")
+    df["Electrolyte Amount (uL)"] =(
+        df["Electrolyte Amount Before Separator (uL)"]
+        + df["Electrolyte Amount After Separator (uL)"]
     )
     return df
 
@@ -95,7 +105,9 @@ def merge_electrodes(df: pd.DataFrame, df_components: pd.DataFrame) -> pd.DataFr
     df_cathode = df_components[[col for col in df_components.columns if "Cathode" in col]]
     df_cathode = df_cathode.dropna(subset=["Cathode Type"])
     # if diameter is missing or 0, set to 14 mm
-    df_cathode["Cathode Diameter (mm)"] = df_cathode["Cathode Diameter (mm)"].fillna(14).replace(0, 14)
+    df_cathode["Cathode Diameter (mm)"] = (
+        df_cathode["Cathode Diameter (mm)"].fillna(14).replace(0, 14)
+    )
 
     # If Anode Type or Cathode Type contains duplicates, raise an error
     if df_anode["Anode Type"].duplicated().any() or df_cathode["Cathode Type"].duplicated().any():
@@ -113,19 +125,25 @@ def merge_electrodes(df: pd.DataFrame, df_components: pd.DataFrame) -> pd.DataFr
 def merge_other_components(df: pd.DataFrame, df_components: pd.DataFrame) -> pd.DataFrame:
     """Merge in details of separator, casing, and spacer."""
     # Merge separator into table
-    df_separator = df_components[[col for col in df_components.columns if "Separator" in col]]
+    df_separator = df_components[
+        [col for col in df_components.columns if "Separator" in col]
+    ].dropna()
     df = df.merge(df_separator, on="Separator Type", how="left")
 
     # Merge casing into table
-    df_casing = df_components[[col for col in df_components.columns if "Casing" in col]]
+    df_casing = df_components[[col for col in df_components.columns if "Casing" in col]].dropna()
     df = df.merge(df_casing, on="Casing Type", how="left")
 
     # Merge spacer into table
     df_spacer = df_components[[col for col in df_components.columns if "Spacer" in col]]
     for spacer_pos in ["Top", "Bottom"]:
-        df_spacer_specific = df_spacer.rename(columns={col: f"{spacer_pos} {col}" for col in df_spacer.columns})
+        df_spacer_specific = df_spacer.rename(
+            columns={col: f"{spacer_pos} {col}" for col in df_spacer.columns}
+        ).dropna()
         df = df.merge(df_spacer_specific, on=f"{spacer_pos} Spacer Type", how="left")
-        df[f"{spacer_pos} Spacer Thickness (mm)"] = df[f"{spacer_pos} Spacer Thickness (mm)"].fillna(0)
+        df[f"{spacer_pos} Spacer Thickness (mm)"] = (
+            df[f"{spacer_pos} Spacer Thickness (mm)"].fillna(0)
+        )
     return df
 
 def add_extra_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -189,7 +207,8 @@ def sanity_check(df: pd.DataFrame) -> None:
         "Separator Type",
         "Electrolyte Position",
         "Electrolyte Amount (uL)",
-        "Electrolyte Dispense Order",
+        "Electrolyte Amount Before Separator (uL)",
+        "Electrolyte Amount After Separator (uL)",
         "Batch Number",
     ]
     missing_columns = set(columns_to_check) - set(df.columns)
@@ -197,20 +216,33 @@ def sanity_check(df: pd.DataFrame) -> None:
         msg = f"CRITICAL: these columns are missing from the input: {', '.join(missing_columns)}"
         raise ValueError(msg)
 
-    used_rows = df["Anode Type"].notna() | df["Cathode Type"].notna()
-    if (~df["Electrolyte Dispense Order"].loc[used_rows].isin(["Before", "After", "Both"])).any():
-        msg = "CRITICAL: electrolyte dispense order must be 'Before', 'After' or 'Both'."
-        raise ValueError(msg)
-
     if (df["Electrolyte Amount (uL)"]>500).any():
-        msg = f"Your input has electrolyte volumes that are too large: {max(df['Electrolyte Amount (uL)'])} uL."
+        msg = (
+            "CRITICAL: Your input has electrolyte volumes that are too large: "
+            f"{max(df['Electrolyte Amount (uL)'])} uL."
+        )
         raise ValueError(msg)
 
     if (df["Electrolyte Amount (uL)"]>150).any():
-        print(f'WARNING: your input has large electrolyte volumes up {max(df["Electrolyte Amount (uL)"])} uL.')
+        print(
+            "WARNING: your input has large electrolyte volumes up to "
+            f"{max(df["Electrolyte Amount (uL)"])} uL.",
+        )
 
-    if (df["Rack Position"] != pd.Series(range(1, 37))).any():
-        msg = "Rack positions must be sequential 1-36. Check the input file."
+    if any(df["Rack Position"].to_numpy() != np.arange(1, 37)):
+        msg = "CRITICAL: Rack positions must be sequential 1-36. Check the input file."
+        raise ValueError(msg)
+
+    if any((df["Top Spacer Thickness (mm)"] + df["Bottom Spacer Thickness (mm)"]) > 1.5):
+        msg = "CRITICAL: Too much spacer! For safety reasons you can only have <1.5 mm total."
+        raise ValueError(msg)
+
+    if any(df["Top Spacer Thickness (mm)"] < 0) or any(df["Bottom Spacer Thickness (mm)"] < 0):
+        msg = "CRITICAL: Negative valued spacer thickness."
+        raise ValueError(msg)
+
+    if any(df["Separator Thickness (mm)"] > 1.0):
+        msg = "CRITICAL: You have separators thicker than 1 mm, this is not currently allowed."
         raise ValueError(msg)
 
 def write_to_sql(
