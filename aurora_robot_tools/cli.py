@@ -1,7 +1,10 @@
 """Command line interface for robot tools."""
 from typer import Argument, Typer
 
-app = Typer()
+app = Typer(
+    add_completion=False,
+    pretty_exceptions_enable=False,
+)
 
 @app.command()
 def import_excel() -> None:
