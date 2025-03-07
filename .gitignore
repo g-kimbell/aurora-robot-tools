@@ -12,8 +12,14 @@ ENV/
 env.bak/
 venv.bak/
 
-# ignore all executables
+# all executables
 *.exe
 
-# ignore all ipython notebooks, which are mainly used for testing
+# all ipython notebooks, sometimes used for testing
 *.ipynb
+
+# egg-info directories from setuptools
+*.egg-info/
+
+# mypy cache for type checking
+.mypy_cache/

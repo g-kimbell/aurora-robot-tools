@@ -3,9 +3,9 @@
 # -*-mode:python ; tab-width:4 -*- ex:set tabstop=4 shiftwidth=4 expandtab: -*-
 
 import numpy
-from gxipy.gxwrapper import *
-from gxipy.dxwrapper import *
-from gxipy.gxidef import *
+from aurora_robot_tools.camera.gxipy.gxwrapper import *
+from aurora_robot_tools.camera.gxipy.dxwrapper import *
+from aurora_robot_tools.camera.gxipy.gxidef import *
 import types
 
 ERROR_SIZE = 1024

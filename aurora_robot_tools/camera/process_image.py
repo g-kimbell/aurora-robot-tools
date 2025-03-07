@@ -61,6 +61,8 @@ import pandas as pd
 from PIL import Image
 from scipy import signal
 
+from aurora_robot_tools.config import DATABASE_FILEPATH, IMAGE_DIR
+
 
 def _parse_filename(filename: str) -> list[dict]:
     """Take photo filename and returns dict of lists of press cell and step.
@@ -530,15 +532,13 @@ class ProcessImages:
 if __name__ == "__main__":
 
     # Get Run ID from database
-    DATABASE_FILEPATH = "C:/Modules/Database/chemspeedDB.db"
     with sqlite3.connect(DATABASE_FILEPATH) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT `value` FROM Settings_Table WHERE `key` = 'Base Sample ID'")
         run_id = cursor.fetchone()[0]
 
     # PARAMETER
-    IMAGE_FOLDER = "C:/Aurora_images/"
-    folderpath = os.path.join(IMAGE_FOLDER, run_id)
+    folderpath = os.path.join(IMAGE_DIR, run_id)
 
     obj = ProcessImages(folderpath)
     data_list = obj.load_files()
