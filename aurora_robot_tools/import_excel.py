@@ -233,8 +233,8 @@ def sanity_check(df: pd.DataFrame) -> None:
         msg = "CRITICAL: Rack positions must be sequential 1-36. Check the input file."
         raise ValueError(msg)
 
-    if any((df["Top Spacer Thickness (mm)"] + df["Bottom Spacer Thickness (mm)"]) > 1.5):
-        msg = "CRITICAL: Too much spacer! For safety reasons you can only have <1.5 mm total."
+    if any((df["Top Spacer Thickness (mm)"] + df["Bottom Spacer Thickness (mm)"]) > 2.0):
+        msg = "CRITICAL: Too much spacer! For safety reasons you can only have <= 2.0 mm total."
         raise ValueError(msg)
 
     if any(df["Top Spacer Thickness (mm)"] < 0) or any(df["Bottom Spacer Thickness (mm)"] < 0):
