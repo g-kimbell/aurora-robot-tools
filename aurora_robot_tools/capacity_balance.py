@@ -48,6 +48,7 @@ Todo:
       allow the user to choose the best one.
 
 """
+
 import itertools
 import sqlite3
 import sys
@@ -71,9 +72,8 @@ def calculate_capacity(df: pd.DataFrame) -> None:
     """
     for xode in ["Anode", "Cathode"]:
         df[f"{xode} Active Material Mass (mg)"] = (
-            (df[f"{xode} Mass (mg)"] - df[f"{xode} Current Collector Mass (mg)"])
-            * df[f"{xode} Active Material Mass Fraction"]
-        )
+            df[f"{xode} Mass (mg)"] - df[f"{xode} Current Collector Mass (mg)"]
+        ) * df[f"{xode} Active Material Mass Fraction"]
         df[f"{xode} Balancing Capacity (mAh)"] = (
             1e-3 * df[f"{xode} Active Material Mass (mg)"] * df[f"{xode} Balancing Specific Capacity (mAh/g)"]
         )
@@ -98,8 +98,8 @@ def cost_matrix_assign(df: pd.DataFrame, rejection_cost_factor: float = 2) -> tu
     """
     # Calculate all possible N:P ratios
     actual_ratio = np.outer(
-        df["Anode Balancing Capacity (mAh)"] / df["Anode Diameter (mm)"]**2,
-        1 / (df["Cathode Balancing Capacity (mAh)"] / df["Cathode Diameter (mm)"]**2),
+        df["Anode Balancing Capacity (mAh)"] / df["Anode Diameter (mm)"] ** 2,
+        1 / (df["Cathode Balancing Capacity (mAh)"] / df["Cathode Diameter (mm)"] ** 2),
     )
     n = actual_ratio.shape[0]
 
@@ -147,7 +147,7 @@ def exact_npartite_matching(cost_matrix: np.ndarray) -> tuple[np.ndarray, np.nda
     problem = pulp.LpProblem("3D_assignment", pulp.LpMinimize)
 
     # The objective is to minimize the total cost of the chosen assignments
-    problem += pulp.lpSum(cost_matrix[a]*x[a] for a in assignments)
+    problem += pulp.lpSum(cost_matrix[a] * x[a] for a in assignments)
 
     # Add constraints ensuring each x, y, and z is used exactly once
     for i in range(n):
@@ -157,14 +157,14 @@ def exact_npartite_matching(cost_matrix: np.ndarray) -> tuple[np.ndarray, np.nda
 
     # Solve the problem
     print(f"Attempting exact matching, will give up if a solution not found in {TIMEOUT_SECONDS} seconds...")
-    problem.solve(pulp.PULP_CBC_CMD(options=[f"sec={TIMEOUT_SECONDS}"],msg=False))
+    problem.solve(pulp.PULP_CBC_CMD(options=[f"sec={TIMEOUT_SECONDS}"], msg=False))
     if pulp.LpStatus[problem.status] != "Optimal":
         msg = f"Optimal solution not found. Status: {pulp.LpStatus[problem.status]}"
         raise ValueError(msg)
     print("Optimal solution found")
     # Get the optimal assignments
     optimal_assignments = np.array([a for a in assignments if pulp.value(x[a]) == 1])
-    i_idx, j_idx, k_idx = optimal_assignments[:,0], optimal_assignments[:,1], optimal_assignments[:,2]
+    i_idx, j_idx, k_idx = optimal_assignments[:, 0], optimal_assignments[:, 1], optimal_assignments[:, 2]
     return i_idx, j_idx, k_idx
 
 
@@ -197,15 +197,15 @@ def greedy_npartite_matching(cost_matrix: np.ndarray) -> tuple[np.ndarray, np.nd
             for i in range(3):
                 used_indices[i].add(a[i])
     chosen_assignments = np.array(chosen_assignments)
-    i_idx, j_idx, k_idx = chosen_assignments[:,0], chosen_assignments[:,1], chosen_assignments[:,2]
+    i_idx, j_idx, k_idx = chosen_assignments[:, 0], chosen_assignments[:, 1], chosen_assignments[:, 2]
     return i_idx, j_idx, k_idx
 
 
 def cost_matrix_assign_3d(
-        df: pd.DataFrame,
-        rejection_cost_factor: float = 2,
-        exact: bool = False,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    df: pd.DataFrame,
+    rejection_cost_factor: float = 2,
+    exact: bool = False,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculate the cost matrix and find optimal matching with 3D algorithm.
 
     Args:
@@ -223,9 +223,9 @@ def cost_matrix_assign_3d(
     n = len(df)
 
     # Convert all 1D arrays to 3D n x n x n arrays
-    anode_capacity = np.array(df["Anode Balancing Capacity (mAh)"]/df["Anode Diameter (mm)"]**2)
+    anode_capacity = np.array(df["Anode Balancing Capacity (mAh)"] / df["Anode Diameter (mm)"] ** 2)
     anode_capacity = np.tile(anode_capacity[:, np.newaxis, np.newaxis], (1, n, n))
-    cathode_capacity = np.array(df["Cathode Balancing Capacity (mAh)"]/df["Cathode Diameter (mm)"]**2)
+    cathode_capacity = np.array(df["Cathode Balancing Capacity (mAh)"] / df["Cathode Diameter (mm)"] ** 2)
     cathode_capacity = np.tile(cathode_capacity[np.newaxis, :, np.newaxis], (n, 1, n))
     target_ratio = np.array(df["N:P Ratio Target"])
     target_ratio = np.tile(target_ratio[np.newaxis, np.newaxis, :], (n, n, 1))
@@ -235,15 +235,15 @@ def cost_matrix_assign_3d(
     max_ratio = np.tile(max_ratio[np.newaxis, np.newaxis, :], (n, n, 1))
 
     # Calculate the 3D cost matrix
-    cost_matrix = anode_capacity/cathode_capacity - target_ratio
+    cost_matrix = anode_capacity / cathode_capacity - target_ratio
 
     # If the cost diff is negative, divide by (min_ratio - target_ratio)
     neg_mask = cost_matrix < 0
-    cost_matrix[neg_mask] = cost_matrix[neg_mask]/(min_ratio[neg_mask] - target_ratio[neg_mask])
+    cost_matrix[neg_mask] = cost_matrix[neg_mask] / (min_ratio[neg_mask] - target_ratio[neg_mask])
 
     # If the cost diff is positive, divide by (max_ratio - target_ratio)
     pos_mask = cost_matrix > 0
-    cost_matrix[pos_mask] = cost_matrix[pos_mask]/(max_ratio[pos_mask] - target_ratio[pos_mask])
+    cost_matrix[pos_mask] = cost_matrix[pos_mask] / (max_ratio[pos_mask] - target_ratio[pos_mask])
 
     # If the normalised cost is over 1 the cell is rejected, so set the cost to the rejection_cost_factor
     cost_matrix[cost_matrix > 1] = rejection_cost_factor
@@ -261,17 +261,17 @@ def cost_matrix_assign_3d(
         anode_ind, cathode_ind, ratio_ind = greedy_npartite_matching(cost_matrix)
 
     # Sort such that the anode doesn't change order
-    ind_sort=np.argsort(anode_ind)
+    ind_sort = np.argsort(anode_ind)
     return anode_ind[ind_sort], cathode_ind[ind_sort], ratio_ind[ind_sort]
 
 
 def rearrange_electrode_columns(
-        df: pd.DataFrame,
-        row_indices: np.ndarray,
-        anode_ind: np.ndarray,
-        cathode_ind: np.ndarray,
-        ratio_ind: np.ndarray,
-    ) -> None:
+    df: pd.DataFrame,
+    row_indices: np.ndarray,
+    anode_ind: np.ndarray,
+    cathode_ind: np.ndarray,
+    ratio_ind: np.ndarray,
+) -> None:
     """Rearrange eletrode columns in-place in the main dataframe.
 
     Args:
@@ -293,7 +293,7 @@ def rearrange_electrode_columns(
     for column in ratio_columns:
         df.loc[row_indices, column] = df_immutable.loc[row_indices[ratio_ind], column].to_numpy()
     # Recalculate N:P ratio overlap factor
-    df["N:P ratio overlap factor"] = (df["Cathode Diameter (mm)"]**2 / df["Anode Diameter (mm)"]**2).fillna(0)
+    df["N:P ratio overlap factor"] = (df["Cathode Diameter (mm)"] ** 2 / df["Anode Diameter (mm)"] ** 2).fillna(0)
 
 
 def update_cell_numbers(df: pd.DataFrame, base_sample_id: str, check_NP_ratio: bool = True) -> None:
@@ -303,26 +303,29 @@ def update_cell_numbers(df: pd.DataFrame, base_sample_id: str, check_NP_ratio: b
         df (pandas.DataFrame): The dataframe containing the cell assembly data.
         base_sample_id (str): The run ID for the cells.
         check_NP_ratio (bool, optional): Check the N:P ratio. Defaults to True.
+
     """
     if check_NP_ratio:
-        df["N:P Ratio"] = (
-            (df["Anode Balancing Capacity (mAh)"] / df["Anode Diameter (mm)"]**2) /
-            (df["Cathode Balancing Capacity (mAh)"] / df["Cathode Diameter (mm)"]**2)
+        df["N:P Ratio"] = (df["Anode Balancing Capacity (mAh)"] / df["Anode Diameter (mm)"] ** 2) / (
+            df["Cathode Balancing Capacity (mAh)"] / df["Cathode Diameter (mm)"] ** 2
         )
-        cell_meets_criteria = ((df["N:P Ratio"] >= df["N:P Ratio Minimum"])
-                                & (df["N:P Ratio"] <= df["N:P Ratio Maximum"]))
+        cell_meets_criteria = (df["N:P Ratio"] >= df["N:P Ratio Minimum"]) & (
+            df["N:P Ratio"] <= df["N:P Ratio Maximum"]
+        )
         accepted_cell_indices = np.where(cell_meets_criteria)[0]
         rejected_cell_indices = np.where(~cell_meets_criteria & ~df["N:P Ratio"].isna())[0]
-        average_deviation = np.mean(np.abs(df["N:P Ratio"][accepted_cell_indices]
-                                        - df["N:P Ratio Target"][accepted_cell_indices]))
-        print(f"Accepted {len(accepted_cell_indices)} cells "
+        average_deviation = np.mean(
+            np.abs(df["N:P Ratio"][accepted_cell_indices] - df["N:P Ratio Target"][accepted_cell_indices])
+        )
+        print(
+            f"Accepted {len(accepted_cell_indices)} cells "
             f"with average N:P deviation from target: {average_deviation:.4f}\n"
-            f"Rejected {len(rejected_cell_indices)} cells.")
+            f"Rejected {len(rejected_cell_indices)} cells."
+        )
     else:
         # accept any cell with an anode and cathode
         accepted_cell_indices = np.where(
-            ~df["Anode Type"].isna() &
-            ~df["Cathode Type"].isna(),
+            ~df["Anode Type"].isna() & ~df["Cathode Type"].isna(),
         )[0]
         print(f"Accepted {len(accepted_cell_indices)} cells without checking N:P ratio.")
 
@@ -369,11 +372,11 @@ def main(sorting_method: int) -> None:
 
     for batch_number in batch_numbers:
         batch_mask = (
-            (df["Batch Number"] == batch_number) &
-            (df["Last Completed Step"] == 0) &
-            (df["Error Code"] == 0) &
-            (df["Anode Balancing Capacity (mAh)"] > 0) &
-            (df["Cathode Balancing Capacity (mAh)"] > 0)
+            (df["Batch Number"] == batch_number)
+            & (df["Last Completed Step"] == 0)
+            & (df["Error Code"] == 0)
+            & (df["Anode Balancing Capacity (mAh)"] > 0)
+            & (df["Cathode Balancing Capacity (mAh)"] > 0)
         )
         df_batch = df[batch_mask]
         # if no cells in this batch, skip
@@ -385,22 +388,21 @@ def main(sorting_method: int) -> None:
         n_rows_skipped = sum(df["Batch Number"] == batch_number) - n_rows
         print(f"Batch number {batch_number} has {n_rows} cells.")
         if n_rows_skipped:
-            print(f"Ignoring {n_rows_skipped} cells that do not have "
-                    f"Last Completed Step = 0 and Error Code = 0.")
+            print(f"Ignoring {n_rows_skipped} cells that do not have Last Completed Step = 0 and Error Code = 0.")
 
         # Reorder the anode and cathode rack positions based on the sorting method
         match sorting_method:
-            case 0: # Do not sort, do not check N:P ratio
+            case 0:  # Do not sort, do not check N:P ratio
                 anode_ind = np.arange(n_rows)
                 cathode_ind = np.arange(n_rows)
                 ratio_ind = np.arange(n_rows)
 
-            case 1: # Do not sort
+            case 1:  # Do not sort
                 anode_ind = np.arange(n_rows)
                 cathode_ind = np.arange(n_rows)
                 ratio_ind = np.arange(n_rows)
 
-            case 2: # Order by capacity
+            case 2:  # Order by capacity
                 # I think this is always worse than the cost matrix approach
                 anode_sort = np.argsort(df_batch["Anode Balancing Capacity (mAh)"])
                 cathode_sort = np.argsort(df_batch["Cathode Balancing Capacity (mAh)"])
@@ -409,36 +411,39 @@ def main(sorting_method: int) -> None:
                 cathode_ind = cathode_sort.iloc[np.argsort(anode_sort)]
                 ratio_ind = np.arange(n_rows)
 
-            case 3: # Use cost matrix and linear sum assignment
+            case 3:  # Use cost matrix and linear sum assignment
                 anode_ind, cathode_ind = cost_matrix_assign(df_batch)
                 ratio_ind = np.arange(n_rows)
 
-            case 4: # Use greedy 3D matching
+            case 4:  # Use greedy 3D matching
                 anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch)
 
-            case 5: # Use exact 3D matching
+            case 5:  # Use exact 3D matching
                 try:
-                    anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch,exact=True)
+                    anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch, exact=True)
                 except ValueError:
                     print("Exact matching took too long, using greedy matching instead")
                     anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch)
 
-            case 6: # Choose automatically
+            case 6:  # Choose automatically
                 # If all ratios are the same, use 2d matching
-                if (len(df_batch["N:P Ratio Target"].unique()) == 1 &
-                    len(df_batch["N:P Ratio Minimum"].unique()) == 1 &
-                    len(df_batch["N:P Ratio Maximum"].unique()) == 1):
+                if (
+                    len(df_batch["N:P Ratio Target"].unique())
+                    == 1 & len(df_batch["N:P Ratio Minimum"].unique())
+                    == 1 & len(df_batch["N:P Ratio Maximum"].unique())
+                    == 1
+                ):
                     anode_ind, cathode_ind = cost_matrix_assign(df_batch)
                     ratio_ind = np.arange(n_rows)
                 # Otherwise, try exact matching, if timeout use greedy matching
                 else:
                     try:
-                        anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch,exact=True)
+                        anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch, exact=True)
                     except ValueError:
                         print("Exact matching took too long, using greedy matching instead")
                         anode_ind, cathode_ind, ratio_ind = cost_matrix_assign_3d(df_batch)
 
-            case 7: # Reverse order by capacity
+            case 7:  # Reverse order by capacity
                 # maximises N:P spread
                 anode_sort = np.argsort(df_batch["Anode Balancing Capacity (mAh)"])
                 cathode_sort = np.argsort(df_batch["Cathode Balancing Capacity (mAh)"]).iloc[::-1]
@@ -460,6 +465,7 @@ def main(sorting_method: int) -> None:
     with sqlite3.connect(DATABASE_FILEPATH) as conn:
         df.to_sql("Cell_Assembly_Table", conn, index=False, if_exists="replace")
     print("Updated database successfully")
+
 
 if __name__ == "__main__":
     sorting_method = int(sys.argv[1]) if len(sys.argv) >= 2 else 6

@@ -9,6 +9,7 @@ used by the AutoSuite software to assemble the cells.
 Usage:
     Run file directly, use the CLI, or call from Autosuite software.
 """
+
 import sqlite3
 import warnings
 from pathlib import Path
@@ -22,14 +23,15 @@ from aurora_robot_tools.config import DATABASE_FILEPATH, INPUT_DIR
 # Ignore the pandas data validation warning
 warnings.filterwarnings("ignore", ".*extension is not supported and will be removed.*")
 
+
 def get_input(default: str | Path) -> Path:
     """Open a dialog to select the input file."""
     Tk().withdraw()  # to hide the main window
     file_path = Path(
         filedialog.askopenfilename(
-            initialdir = default,
-            title = "Select the input Excel file",
-            filetypes = [("Excel files", "*.xlsx")],
+            initialdir=default,
+            title="Select the input Excel file",
+            filetypes=[("Excel files", "*.xlsx")],
         ),
     )
     # check if it is a valid excel file
@@ -41,7 +43,8 @@ def get_input(default: str | Path) -> Path:
         raise ValueError(msg)
     return file_path
 
-def read_excel(input_filepath: Path) -> tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
+
+def read_excel(input_filepath: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Read excel file, return as main, component and electrolyte dataframes."""
     try:
         df = pd.read_excel(
@@ -63,6 +66,7 @@ def read_excel(input_filepath: Path) -> tuple[pd.DataFrame,pd.DataFrame,pd.DataF
         raise
     return df, df_components, df_electrolyte
 
+
 def create_aux_tables(input_filepath: Path) -> pd.DataFrame:
     """Create the press, settings and timestamp tables."""
     df_press = pd.DataFrame()
@@ -72,12 +76,13 @@ def create_aux_tables(input_filepath: Path) -> pd.DataFrame:
     df_press["Last Completed Step"] = 0
 
     df_settings = pd.DataFrame()
-    df_settings["key"] = ["Input Filepath","Base Sample ID"]
-    df_settings["value"] = [str(input_filepath),str(input_filepath.stem)]
+    df_settings["key"] = ["Input Filepath", "Base Sample ID"]
+    df_settings["value"] = [str(input_filepath), str(input_filepath.stem)]
 
     df_timestamp = pd.DataFrame(columns=["Cell Number", "Step Number", "Timestamp", "Complete"])
 
     return df_press, df_settings, df_timestamp
+
 
 def merge_electrolyte(df: pd.DataFrame, df_electrolyte: pd.DataFrame) -> pd.DataFrame:
     """Merge electrolyte details into the main dataframe based on electrolyte position."""
@@ -87,11 +92,11 @@ def merge_electrolyte(df: pd.DataFrame, df_electrolyte: pd.DataFrame) -> pd.Data
     df["Electrolyte Description"] = df["Electrolyte Position"].map(
         df_electrolyte.set_index("Electrolyte Position")["Description"],
     )
-    df["Electrolyte Amount (uL)"] =(
-        df["Electrolyte Amount Before Separator (uL)"]
-        + df["Electrolyte Amount After Separator (uL)"]
+    df["Electrolyte Amount (uL)"] = (
+        df["Electrolyte Amount Before Separator (uL)"] + df["Electrolyte Amount After Separator (uL)"]
     )
     return df
+
 
 def merge_electrodes(df: pd.DataFrame, df_components: pd.DataFrame) -> pd.DataFrame:
     """Merge electrode details into the main dataframe based on electrode type."""
@@ -105,9 +110,7 @@ def merge_electrodes(df: pd.DataFrame, df_components: pd.DataFrame) -> pd.DataFr
     df_cathode = df_components[[col for col in df_components.columns if "Cathode" in col]]
     df_cathode = df_cathode.dropna(subset=["Cathode Type"])
     # if diameter is missing or 0, set to 14 mm
-    df_cathode["Cathode Diameter (mm)"] = (
-        df_cathode["Cathode Diameter (mm)"].fillna(14).replace(0, 14)
-    )
+    df_cathode["Cathode Diameter (mm)"] = df_cathode["Cathode Diameter (mm)"].fillna(14).replace(0, 14)
 
     # If Anode Type or Cathode Type contains duplicates, raise an error
     if df_anode["Anode Type"].duplicated().any() or df_cathode["Cathode Type"].duplicated().any():
@@ -122,12 +125,11 @@ def merge_electrodes(df: pd.DataFrame, df_components: pd.DataFrame) -> pd.DataFr
     df = df.merge(df_cathode, on="Cathode Type", how="left")
     return df
 
+
 def merge_other_components(df: pd.DataFrame, df_components: pd.DataFrame) -> pd.DataFrame:
     """Merge in details of separator, casing, and spacer."""
     # Merge separator into table
-    df_separator = df_components[
-        [col for col in df_components.columns if "Separator" in col]
-    ].dropna()
+    df_separator = df_components[[col for col in df_components.columns if "Separator" in col]].dropna()
     df = df.merge(df_separator, on="Separator Type", how="left")
 
     # Merge casing into table
@@ -141,10 +143,9 @@ def merge_other_components(df: pd.DataFrame, df_components: pd.DataFrame) -> pd.
             columns={col: f"{spacer_pos} {col}" for col in df_spacer.columns}
         ).dropna()
         df = df.merge(df_spacer_specific, on=f"{spacer_pos} Spacer Type", how="left")
-        df[f"{spacer_pos} Spacer Thickness (mm)"] = (
-            df[f"{spacer_pos} Spacer Thickness (mm)"].fillna(0)
-        )
+        df[f"{spacer_pos} Spacer Thickness (mm)"] = df[f"{spacer_pos} Spacer Thickness (mm)"].fillna(0)
     return df
+
 
 def add_extra_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Add columns which will be filled in by the robot later."""
@@ -173,6 +174,7 @@ def add_extra_columns(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+
 def reorder_df(df: pd.DataFrame) -> pd.DataFrame:
     """Re-order columns in database, put frequently used at start, otherwise alphabetical."""
     columns = df.columns.tolist()
@@ -188,6 +190,7 @@ def reorder_df(df: pd.DataFrame) -> pd.DataFrame:
         columns.remove(f)
     columns = first_cols + sorted(columns)
     return df[columns]
+
 
 def sanity_check(df: pd.DataFrame) -> None:
     """Check columns are present and have sensible values."""
@@ -216,17 +219,15 @@ def sanity_check(df: pd.DataFrame) -> None:
         msg = f"CRITICAL: these columns are missing from the input: {', '.join(missing_columns)}"
         raise ValueError(msg)
 
-    if (df["Electrolyte Amount (uL)"]>500).any():
+    if (df["Electrolyte Amount (uL)"] > 500).any():
         msg = (
-            "CRITICAL: Your input has electrolyte volumes that are too large: "
-            f"{max(df['Electrolyte Amount (uL)'])} uL."
+            f"CRITICAL: Your input has electrolyte volumes that are too large: {max(df['Electrolyte Amount (uL)'])} uL."
         )
         raise ValueError(msg)
 
-    if (df["Electrolyte Amount (uL)"]>150).any():
+    if (df["Electrolyte Amount (uL)"] > 150).any():
         print(
-            "WARNING: your input has large electrolyte volumes up to "
-            f"{max(df["Electrolyte Amount (uL)"])} uL.",
+            f"WARNING: your input has large electrolyte volumes up to {max(df['Electrolyte Amount (uL)'])} uL.",
         )
 
     if any(df["Rack Position"].to_numpy() != np.arange(1, 37)):
@@ -245,14 +246,15 @@ def sanity_check(df: pd.DataFrame) -> None:
         msg = "CRITICAL: You have separators thicker than 1 mm, this is not currently allowed."
         raise ValueError(msg)
 
+
 def write_to_sql(
-        db_path: Path,
-        df: pd.DataFrame,
-        df_press: pd.DataFrame,
-        df_electrolyte: pd.DataFrame,
-        df_settings: pd.DataFrame,
-        df_timestamp: pd.DataFrame,
-    ) -> None:
+    db_path: Path,
+    df: pd.DataFrame,
+    df_press: pd.DataFrame,
+    df_electrolyte: pd.DataFrame,
+    df_settings: pd.DataFrame,
+    df_timestamp: pd.DataFrame,
+) -> None:
     """Write the dataframes to an SQLite3 database to be used by the robot."""
     with sqlite3.connect(db_path) as conn:
         df.to_sql(
@@ -279,36 +281,37 @@ def write_to_sql(
             if_exists="replace",
             dtype={col: "INTEGER" for col in df_press.columns},
         )
-        electrolyte_dtype={col: "REAL" for col in df_electrolyte.columns}
+        electrolyte_dtype = {col: "REAL" for col in df_electrolyte.columns}
         electrolyte_dtype["Electrolyte Position"] = "INTEGER"
         electrolyte_dtype["Name"] = "TEXT"
         electrolyte_dtype["Description"] = "TEXT"
         df_electrolyte.to_sql(
             "Electrolyte_Table",
             conn,
-            index = False,
-            if_exists = "replace",
-            dtype = electrolyte_dtype,
+            index=False,
+            if_exists="replace",
+            dtype=electrolyte_dtype,
         )
         df_settings.to_sql(
             "Settings_Table",
             conn,
-            index = False,
-            if_exists = "replace",
-            dtype = {"key": "TEXT", "value": "TEXT"},
+            index=False,
+            if_exists="replace",
+            dtype={"key": "TEXT", "value": "TEXT"},
         )
         df_timestamp.to_sql(
             "Timestamp_Table",
             conn,
-            index = False,
-            if_exists = "replace",
-            dtype = {
+            index=False,
+            if_exists="replace",
+            dtype={
                 "Cell Number": "INTEGER",
                 "Step Number": "INTEGER",
                 "Timestamp": "VARCHAR(255)",
                 "Complete": "BOOLEAN",
             },
         )
+
 
 def main() -> None:
     """Read in excel input, manipulate, and write to sql database."""
@@ -324,6 +327,7 @@ def main() -> None:
     sanity_check(df)
     write_to_sql(Path(DATABASE_FILEPATH), df, df_press, df_electrolyte, df_settings, df_timestamp)
     print("Successfully updated the database.")
+
 
 if __name__ == "__main__":
     main()

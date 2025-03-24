@@ -1,8 +1,9 @@
 """Copyright © 2025, Empa, Graham Kimbell, Enea Svaluto-Ferro, Ruben Kuhnel, Corsin Battaglia.
 
-Capture an image from the camera and save as png and raw 12-bit numpy array.
+Capture an image from the top down camera and save as png and raw 12-bit numpy array.
 
 """
+
 import sqlite3
 from time import sleep
 
@@ -79,19 +80,20 @@ def main() -> None:
         press_cell_steps = cursor.fetchall()
 
     # Make filename from press/cell/step numbers
-    folderpath = IMAGE_DIR/run_id
+    folderpath = IMAGE_DIR / run_id
     folderpath.mkdir(parents=True, exist_ok=True)
-    filename = "_".join([f"p{p}c{c}s{s}" for p,c,s in press_cell_steps])
+    filename = "_".join([f"p{p}c{c}s{s}" for p, c, s in press_cell_steps])
 
     # Save lossy compressed png image, make sure filename doesn't already exist
-    if (folderpath/filename).with_suffix(".png").exists():
+    if (folderpath / filename).with_suffix(".png").exists():
         i = 1
-        while (folderpath/(filename+f"_{i}")).with_suffix(".png").exists():
+        while (folderpath / (filename + f"_{i}")).with_suffix(".png").exists():
             i += 1
         filename += f"_{i}"
-    im.save((folderpath/filename).with_suffix(".png"), compress_level=9)
-    with h5py.File((folderpath/filename).with_suffix(".h5"), "w") as f:
+    im.save((folderpath / filename).with_suffix(".png"), compress_level=9)
+    with h5py.File((folderpath / filename).with_suffix(".h5"), "w") as f:
         f.create_dataset("image", data=numpy_image, compression="gzip", compression_opts=9)
+
 
 if __name__ == "__main__":
     main()
