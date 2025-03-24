@@ -75,7 +75,7 @@ def create_aux_tables(input_filepath: Path) -> pd.DataFrame:
     df_settings["key"] = ["Input Filepath","Base Sample ID"]
     df_settings["value"] = [str(input_filepath),str(input_filepath.stem)]
 
-    df_timestamp = pd.DataFrame(columns = ["Cell Number","Step Number","Timestamp"])
+    df_timestamp = pd.DataFrame(columns=["Cell Number", "Step Number", "Timestamp", "Complete"])
 
     return df_press, df_settings, df_timestamp
 
@@ -306,6 +306,7 @@ def write_to_sql(
                 "Cell Number": "INTEGER",
                 "Step Number": "INTEGER",
                 "Timestamp": "VARCHAR(255)",
+                "Complete": "BOOLEAN",
             },
         )
 

@@ -23,7 +23,7 @@ def read_db(db_path: Path, press_step: int) -> tuple[pd.DataFrame, pd.DataFrame,
             conn,
         )
         df_timestamp = pd.read_sql(
-            "SELECT * FROM Timestamp_Table",
+            "SELECT * FROM Timestamp_Table WHERE `Complete` = 1",
             conn,
         )
         cursor = conn.cursor()
