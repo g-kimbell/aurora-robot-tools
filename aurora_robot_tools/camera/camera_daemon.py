@@ -39,8 +39,8 @@ def socket_listener() -> None:
             photo_path = PHOTO_PATH / run_id / f"{label!s}.png"
             if not photo_path.parent.exists():
                 photo_path.parent.mkdir(parents=True)
-            cv2.imwrite(photo_path, latest_frame)
-            print(f"Frame saved as {photo_path}")
+            cv2.imwrite(str(photo_path), latest_frame)
+            print(f"Frame saved as {photo_path!s}")
 
         client_socket.close()
 
