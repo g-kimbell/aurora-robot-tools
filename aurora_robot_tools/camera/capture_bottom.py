@@ -16,5 +16,6 @@ def main() -> None:
             print("Camera daemon not running - start with 'aurora-rt startcam.")
         client.sendall(command.encode())
 
+
 if __name__ == "__main__":
     main()

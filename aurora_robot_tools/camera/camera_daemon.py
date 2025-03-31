@@ -24,6 +24,7 @@ step_radius = {
 }
 radius_mm = 10
 
+
 def socket_listener() -> None:
     """Listen for capture message on socket."""
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -49,7 +50,7 @@ def socket_listener() -> None:
                 result = cursor.fetchone()
                 label = f"cell_{result[0]}_step_{result[1]}"
             global radius_mm
-            radius_mm = step_radius.get(int(result[1]),10)
+            radius_mm = step_radius.get(int(result[1]), 10)
             photo_path = PHOTO_PATH / run_id / f"{label!s}.png"
             if not photo_path.parent.exists():
                 photo_path.parent.mkdir(parents=True)
@@ -75,9 +76,9 @@ def main() -> None:
             break
 
         latest_frame = frame.copy()  # Update the latest frame
-        frame = cv2.circle(frame, (320,240), int(radius_mm*375/20), (0,0,255))
-        frame = cv2.line(frame,(320,0),(320,480), (0,0,255))
-        frame = cv2.line(frame,(0,240),(640,240), (0,0,255))
+        frame = cv2.circle(frame, (320, 240), int(radius_mm * 375 / 20), (0, 0, 255))
+        frame = cv2.line(frame, (320, 0), (320, 480), (0, 0, 255))
+        frame = cv2.line(frame, (0, 240), (640, 240), (0, 0, 255))
         cv2.imshow("Webcam Feed", frame)
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
