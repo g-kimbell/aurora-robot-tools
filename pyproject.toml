@@ -7,16 +7,18 @@ name = "aurora-robot-tools"
 requires-python = ">=3.9"
 version = "0.2.0"
 dependencies = [
+    "h5py",
+    "iai-gxipy",
     "numpy",
+    "opencv-python",
+    "openpyxl",
     "pandas",
-    "pytz",
+    "pillow",
     "pulp",
+    "pytz",
+    "pyserial",
     "scipy",
     "typer",
-    "openpyxl",
-    "pillow",
-    "h5py",
-    "opencv-python",
 ]
 
 [project.optional-dependencies]
