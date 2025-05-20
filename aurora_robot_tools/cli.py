@@ -79,10 +79,12 @@ def output() -> None:
 
     output_main()
 
+
 @app.command()
 def led(setting: str) -> None:
     """Set the LED ring light color."""
     from aurora_robot_tools.camera.ringlight import set_light
+
     set_light(setting)
 
 if __name__ == "__main__":

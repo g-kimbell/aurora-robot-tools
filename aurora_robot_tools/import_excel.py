@@ -140,7 +140,7 @@ def merge_other_components(df: pd.DataFrame, df_components: pd.DataFrame) -> pd.
     df_spacer = df_components[[col for col in df_components.columns if "Spacer" in col]]
     for spacer_pos in ["Top", "Bottom"]:
         df_spacer_specific = df_spacer.rename(
-            columns={col: f"{spacer_pos} {col}" for col in df_spacer.columns}
+            columns={col: f"{spacer_pos} {col}" for col in df_spacer.columns},
         ).dropna()
         df = df.merge(df_spacer_specific, on=f"{spacer_pos} Spacer Type", how="left")
         df[f"{spacer_pos} Spacer Thickness (mm)"] = df[f"{spacer_pos} Spacer Thickness (mm)"].fillna(0)
@@ -279,9 +279,9 @@ def write_to_sql(
             conn,
             index=False,
             if_exists="replace",
-            dtype={col: "INTEGER" for col in df_press.columns},
+            dtype=dict.fromkeys(df_press.columns, "INTEGER"),
         )
-        electrolyte_dtype = {col: "REAL" for col in df_electrolyte.columns}
+        electrolyte_dtype = dict.fromkeys(df_electrolyte.columns, "REAL")
         electrolyte_dtype["Electrolyte Position"] = "INTEGER"
         electrolyte_dtype["Name"] = "TEXT"
         electrolyte_dtype["Description"] = "TEXT"

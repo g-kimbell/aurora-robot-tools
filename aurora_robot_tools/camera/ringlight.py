@@ -1,4 +1,5 @@
 """Controls for ring light of camera."""
+
 import serial
 
 allowed_settings = {
@@ -20,8 +21,9 @@ allowed_settings = {
     "5": "5",
     "party": "5",
     "6": "6",
-    "qr":"6",
+    "qr": "6",
 }
+
 
 def set_light(setting: str) -> None:
     """Set camera light.
