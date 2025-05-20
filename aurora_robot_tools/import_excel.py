@@ -311,6 +311,21 @@ def write_to_sql(
                 "Complete": "BOOLEAN",
             },
         )
+        df_calibration = pd.DataFrame(
+            columns=["Cell Number", "Step Number", "dx_mm", "dy_mm"],
+        )
+        df_calibration.to_sql(
+            "Calibration_Table",
+            conn,
+            index=False,
+            if_exists="replace",
+            dtype={
+                "Cell Number": "INTEGER",
+                "Step Number": "INTEGER",
+                "dx_mm": "REAL",
+                "dy_mm": "REAL",
+            },
+        )
 
 
 def main() -> None:
