@@ -59,17 +59,17 @@ def startcam() -> None:
 @app.command()
 def top_photo() -> None:
     """Save a photo of the pressing tools."""
-    from aurora_robot_tools.camera.capture_image import main as photo_main
+    from aurora_robot_tools.camera.send_camera_command import main
 
-    photo_main()
+    main("capturetop")
 
 
 @app.command()
 def bottom_photo() -> None:
     """Save a photo from the bottom-up alignment camera."""
-    from aurora_robot_tools.camera.capture_bottom import main
+    from aurora_robot_tools.camera.send_camera_command import main
 
-    main()
+    main("capturebottom")
 
 
 @app.command()
