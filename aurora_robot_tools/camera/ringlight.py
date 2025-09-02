@@ -1,8 +1,12 @@
-"""Controls for ring light of camera."""
+"""Control the LED ring light on the camera."""
 
 import serial
 
-allowed_settings = {
+# Settings for the serial connection
+COM_PORT = "COM7"
+BAUD_RATE = 9600
+
+all_modes = {
     "0": "0",
     "off": "0",
     "1": "1",
@@ -25,17 +29,12 @@ allowed_settings = {
 }
 
 
-def set_light(setting: str) -> None:
-    """Set camera light.
-
-    Args:
-        setting (str): Input string to set the light, e.g. "r", "b", "g", "off"
-
-    """
-    if setting not in allowed_settings:
-        msg = f"Invalid input: {input}. Valid inputs are: {', '.join(allowed_settings.keys())}"
+def set_light(light_mode: str) -> None:
+    """Input off, r, g, b, w, on, party, qr."""
+    if light_mode not in all_modes:
+        msg = f"Invalid input: {input}. Valid inputs are: {', '.join(all_modes.keys())}"
         raise ValueError(msg)
-    ser = serial.Serial("COM7", 9600, timeout=1)
-    ser.write(allowed_settings[setting].encode())
+    ser = serial.Serial(COM_PORT, BAUD_RATE, timeout=1)
+    ser.write(all_modes[light_mode].encode())
     ser.readall()
     ser.close()
