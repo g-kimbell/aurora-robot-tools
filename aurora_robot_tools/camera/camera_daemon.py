@@ -1,5 +1,6 @@
 """Daemon for live view of bottom-up camera, listens for capture command."""
 
+import contextlib
 import socket
 import sqlite3
 import threading
@@ -52,7 +53,6 @@ def socket_listener() -> None:
 def capture_bottom(client_socket: socket.socket) -> None:
     """Capture an image from the bottom camera."""
     print("Capturing from bottom camera")
-    global last_frame_b
     if last_frame_b is None:
         sleep(1)
         if last_frame_b is None:
@@ -99,7 +99,6 @@ def capture_bottom(client_socket: socket.socket) -> None:
 def capture_top(client_socket: socket.socket) -> None:
     """Capture an image from the top camera."""
     print("Capturing from top camera")
-    global last_frame_t
     if last_frame_t is None:
         sleep(1)
         if last_frame_t is None:
@@ -195,59 +194,102 @@ def add_target(frame: np.ndarray, coords: tuple, radius_mm: float, ratio: float)
 
 def main() -> None:
     """Start webcam, show in window, listen for capture command."""
-    set_light("party")  # Loading light
     global last_frame_b
     global last_frame_t
+
+    try:
+        set_light("party")
+    except Exception:
+        print("Lights not working, continuing without...")
+
+    try:
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.bind(("127.0.0.1", CAMERA_PORT))  # Bind to any interface, port 12345
+        server_socket.close()
+    except OSError:
+        print("Cameras are already running!")
+        return
+
+    thread = threading.Thread(target=socket_listener, daemon=True)
+    thread.start()
+    print("Started listening")
 
     print("Starting cameras, press q to quit.")
 
     # Connect to first USB webcam with DirectShow
-    print("Loading bottom camera...")
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-    cap.set(3, 10000)  # Set max frame size
-    cap.set(4, 10000)
-    ret, frame = cap.read()
-    cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
-    cap.set(28, 1023)  # Set focus to closest distance
-    ret, frame = cap.read()
+    try:
+        print("Loading bottom camera...")
+        cam_b = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        cam_b.set(3, 10000)  # Set max frame size
+        cam_b.set(4, 10000)
+        ret, frame = cam_b.read()
+        cam_b.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+        cam_b.set(28, 1023)  # Set focus to closest distance
+        ret, frame = cam_b.read()
+    except Exception as e:
+        cam_b = None
+        print(f"Error loading bottom camera: {e}")
 
     # Connect to first gxipy camera
-    print("Loading top camera...")
-    device_manager = gx.DeviceManager()
-    dev_num, dev_info_list = device_manager.update_device_list()
-    cam = device_manager.open_device_by_index(1)
-    cam.PixelFormat.set(gx.GxPixelFormatEntry.MONO8)
-    cam.AcquisitionMode.set(gx.GxAcquisitionModeEntry.CONTINUOUS)
-    cam.ExposureAuto.set(gx.GxAutoEntry.CONTINUOUS)
-    cam.stream_on()
+    try:
+        print("Loading top camera...")
+        device_manager = gx.DeviceManager()
+        dev_num, dev_info_list = device_manager.update_device_list()
+        cam_t = device_manager.open_device_by_index(1)
+        if cam_t is not None:
+            cam_t.PixelFormat.set(gx.GxPixelFormatEntry.MONO8)
+            cam_t.AcquisitionMode.set(gx.GxAcquisitionModeEntry.CONTINUOUS)
+            cam_t.ExposureAuto.set(gx.GxAutoEntry.CONTINUOUS)
+            cam_t.stream_on()
+    except ValueError as e:
+        cam_t = None
+        print(f"Error loading top camera: {e}")
+
+    if cam_b is None and cam_t is None:
+        print("No cameras available, exiting.")
+        with contextlib.suppress(Exception):
+            set_light("off")
+        return
 
     thread = threading.Thread(target=socket_listener, daemon=True)
     thread.start()
-    set_light("b")  # Ready light
+
+    # Set light to white to take photos
+    try:
+        set_light("b")
+    except Exception:
+        print("Lights not working, continuing without...")
+
     print("Ready to capture images.")
     try:
         while True:
-            ret, frame_b = cap.read()
-            frame_t = cam.data_stream[0].get_image().get_numpy_array()
-
             # Update bottom camera frame
-            if isinstance(frame_b, np.ndarray):
-                last_frame_b = frame_b.copy()
-                frame_b = shrink_frame(frame_b, 4)
-                frame_b = add_target(frame_b, coords, radius_mm, 4)
-                cv2.imshow("Bottom camera", frame_b)
+            if cam_b is not None:
+                ret, frame_b = cam_b.read()
+                if isinstance(frame_b, np.ndarray):
+                    last_frame_b = frame_b.copy()
+                    frame_b = shrink_frame(frame_b, 4)
+                    frame_b = add_target(frame_b, coords, radius_mm, 4)
+                    cv2.imshow("Bottom camera", frame_b)
 
             # Update top camera frame
-            if isinstance(frame_t, np.ndarray):
-                last_frame_t = frame_t.copy()
-                frame_b = shrink_frame(frame_b, 4)
-                cv2.imshow("Top camera", frame_t)
+            if cam_t is not None:
+                frame_t = cam_t.data_stream[0].get_image().get_numpy_array()
+                if isinstance(frame_t, np.ndarray):
+                    last_frame_t = frame_t.copy()
+                    frame_t = shrink_frame(frame_t, 8)
+                    cv2.imshow("Top camera", frame_t)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
     finally:
-        set_light("off")
-        cap.release()
+        if cam_t is not None:
+            cam_t.stream_off()
+            cam_t.close_device()
+        if cam_b is not None:
+            cam_b.release()
+        with contextlib.suppress(Exception):
+            set_light("off")
         cv2.destroyAllWindows()
 
 
