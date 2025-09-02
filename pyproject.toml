@@ -9,6 +9,7 @@ version = "0.2.0"
 dependencies = [
     "h5py",
     "iai-gxipy",
+    "lxml",
     "numpy",
     "opencv-python",
     "openpyxl",
@@ -19,6 +20,7 @@ dependencies = [
     "pyserial",
     "scipy",
     "typer",
+    "xmltodict",
 ]
 
 [project.optional-dependencies]

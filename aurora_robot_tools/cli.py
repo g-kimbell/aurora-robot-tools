@@ -89,5 +89,56 @@ def led(setting: str) -> None:
 
     set_light(setting)
 
+
+@app.command()
+def find_circles(
+    folder: str = Argument(None),
+) -> None:
+    """Find circles in images."""
+    from pathlib import Path
+
+    from aurora_robot_tools.camera.alignment import process_folder
+
+    # If no folder path is provided, use the current working directory
+    folder_path = Path.cwd() if folder is None else Path(folder)
+    process_folder(folder_path)
+
+
+@app.command()
+def recalibrate(
+    app_path: str,
+    calibration_path: Annotated[list[str] | None, Argument()] = None,
+    fit_to_grid: bool = True,
+) -> None:
+    """Recalibrate the APP file."""
+    from aurora_robot_tools.chemapp_edit import realign_app
+
+    realign_app(app_path, calibration_path, fit_to_grid)
+
+
+@app.command()
+def app_to_xml(filepath: str) -> None:
+    """Convert Chemspeed APP to XML."""
+    from aurora_robot_tools.chemapp_edit import app_to_xml
+
+    app_to_xml(filepath)
+
+
+@app.command()
+def xml_to_app(filepath: str) -> None:
+    """Convert Chemspeed APP to XML."""
+    from aurora_robot_tools.chemapp_edit import xml_to_app
+
+    xml_to_app(filepath)
+
+
+@app.command()
+def led(input: str) -> None:
+    """Set the LED ring light color."""
+    from aurora_robot_tools.camera.ringlight import set_light
+
+    set_light(input)
+
+
 if __name__ == "__main__":
     app()
