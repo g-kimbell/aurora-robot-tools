@@ -1,5 +1,7 @@
 """Command line interface for robot tools."""
 
+from typing import Annotated
+
 from typer import Argument, Typer
 
 app = Typer(
@@ -59,17 +61,17 @@ def startcam() -> None:
 @app.command()
 def top_photo() -> None:
     """Save a photo of the pressing tools."""
-    from aurora_robot_tools.camera.send_camera_command import main
+    from aurora_robot_tools.camera.send_camera_command import send_command
 
-    main("capturetop")
+    send_command("capturetop")
 
 
 @app.command()
 def bottom_photo() -> None:
     """Save a photo from the bottom-up alignment camera."""
-    from aurora_robot_tools.camera.send_camera_command import main
+    from aurora_robot_tools.camera.send_camera_command import send_command
 
-    main("capturebottom")
+    send_command("capturebottom")
 
 
 @app.command()
