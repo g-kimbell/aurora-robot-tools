@@ -74,7 +74,23 @@ def capture_bottom(client_socket: socket.socket) -> None:
         )
         result = cursor.fetchone()
         result = result if result else (0, 0)
-        label = f"cell_{result[0]}_step_{result[1]}"
+        cell_number, step_number = result
+        cursor.execute(
+            "SELECT `Rack Position`, `Anode Rack Position`, `Cathode Rack Position` "  # noqa: S608
+            "FROM Cell_Assembly_Table "
+            f"WHERE `Cell Number` = {result[0]}",
+        )
+        result = cursor.fetchone()
+        result = result if result else (0, 0, 0)
+        if step_number in [30, 80]:  # Anode
+            rack_position = result[1]
+        elif step_number in [40, 90]:  # Cathode
+            rack_position = result[2]
+        elif step_number in [1, 2]:  # pressing tool
+            rack_position = cell_number
+        else:  # Other components
+            rack_position = result[0]
+        label = f"cell_{cell_number}_rack_{rack_position}_step_{step_number}"
     radius_mm = step_radius.get(int(result[1]), 10.0)
 
     # Detect circle in image
@@ -90,7 +106,7 @@ def capture_bottom(client_socket: socket.socket) -> None:
             write_coords_to_db(result[0], result[1], dx_mm, dy_mm)
     else:
         print("Could not detect circle")
-    photo_path = PHOTO_PATH / run_id / "bottom_camera" / f"{label!s}.png"
+    photo_path = PHOTO_PATH / run_id / "bottom_camera" / f"{label!s}.jpg"
     if not photo_path.parent.exists():
         photo_path.parent.mkdir(parents=True)
     cv2.imwrite(str(photo_path), captured_frame)
@@ -123,7 +139,7 @@ def capture_top(client_socket: socket.socket) -> None:
         results = cursor.fetchall()
         results = results if results else [(0, 0, 0)]
         label = "_".join([f"p{p}c{c}s{s}" for p, c, s in results])
-    photo_path = PHOTO_PATH / run_id / "top_camera" / f"{label}.png"
+    photo_path = PHOTO_PATH / run_id / "top_camera" / f"{label}.jpg"
     if not photo_path.parent.exists():
         photo_path.parent.mkdir(parents=True)
     cv2.imwrite(str(photo_path), captured_frame_2)
