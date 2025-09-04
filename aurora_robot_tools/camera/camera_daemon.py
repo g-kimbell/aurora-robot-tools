@@ -164,12 +164,12 @@ def detect_circle(image: np.ndarray, step_radius_px: float) -> tuple:
     circles = cv2.HoughCircles(
         gray,
         cv2.HOUGH_GRADIENT,
-        1,
-        50,
+        2,
+        100,
         param1=50,
-        param2=30,
-        minRadius=int(step_radius_px * 0.99),
-        maxRadius=int(step_radius_px * 1.01),
+        param2=25,
+        minRadius=int(step_radius_px * 0.98),
+        maxRadius=int(step_radius_px * 1.02),
     )
     if circles is not None and len(circles) == 1:
         circle = circles[0][0]
