@@ -198,17 +198,17 @@ def main() -> None:
     global last_frame_t
 
     try:
-        set_light("party")
-    except Exception:
-        print("Lights not working, continuing without...")
-
-    try:
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.bind(("127.0.0.1", CAMERA_PORT))  # Bind to any interface, port 12345
         server_socket.close()
     except OSError:
         print("Cameras are already running!")
         return
+
+    try:
+        set_light("party")
+    except Exception:
+        print("Lights not working, continuing without...")
 
     thread = threading.Thread(target=socket_listener, daemon=True)
     thread.start()
