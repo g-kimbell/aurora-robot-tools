@@ -81,7 +81,8 @@ def capture_bottom(client_socket: socket.socket) -> None:
     global coords
     coords = detect_circle(captured_frame, radius_mm * mm_to_px)
     if coords[0] is not None:
-        y, x, _ = captured_frame.shape
+        x = captured_frame.shape[1]
+        y = captured_frame.shape[0]
         dx_mm = (x // 2 - coords[0]) / mm_to_px
         dy_mm = (y // 2 - coords[1]) / mm_to_px
         print(f"{dx_mm=}, {dy_mm=}")
@@ -164,13 +165,15 @@ def detect_circle(image: np.ndarray, step_radius_px: float) -> tuple:
 
 def shrink_frame(frame: np.ndarray, ratio: float) -> np.ndarray:
     """Shrink the frame by a ratio."""
-    y, x, _ = frame.shape
+    x = frame.shape[1]
+    y = frame.shape[0]
     return cv2.resize(frame, [x // ratio, y // ratio])
 
 
 def add_target(frame: np.ndarray, coords: tuple, radius_mm: float, ratio: float) -> np.ndarray:
     """Add target circles to the frame."""
-    y, x, _ = frame.shape
+    x = frame.shape[1]
+    y = frame.shape[0]
     frame = cv2.circle(frame, (x // 2, y // 2), int(radius_mm * mm_to_px / ratio), (0, 0, 255))
     frame = cv2.line(frame, (x // 2, 0), (x // 2, y), (0, 0, 255))
     frame = cv2.line(frame, (0, y // 2), (x, y // 2), (0, 0, 255))
