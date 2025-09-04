@@ -330,7 +330,7 @@ def realign_app(
 
                 # Write back to the app xml
                 myapp.write_rack_wells(rack_name, wells)
-                print(f"Updated {len(ffdf)} wells in {rack_name}.")
+                print(f"Updated {wells.size} wells in {rack_name}.")
 
     # Save the new app file
     new_filename = app_path.with_name(app_path.stem + "_calibrated.app")
