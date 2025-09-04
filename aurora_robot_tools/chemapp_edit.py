@@ -178,10 +178,10 @@ def get_alignment_from_json(filepath: Path | str) -> pd.DataFrame:
 
 
 step_dict = {
-    "Spacer": {"Step": 20, "Bottom rack": "Spacer Bottom (18 well)", "Top rack": "Spacer Top (18 well)"},
     "Anode": {"Step": 30, "Bottom rack": "Anode Bottom (18 well)", "Top rack": "Anode Top (18 well)"},
     "Cathode": {"Step": 40, "Bottom rack": "Cathode Bottom (18 well)", "Top rack": "Cathode Top (18 well)"},
     "Separator": {"Step": 60, "Bottom rack": "Separator Bottom (18 well)", "Top rack": "Separator Top (18 well)"},
+    "Spacer": {"Step": 100, "Bottom rack": "Spacer Bottom (18 well)", "Top rack": "Spacer Top (18 well)"},
 }
 
 
