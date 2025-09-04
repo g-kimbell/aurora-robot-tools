@@ -218,7 +218,7 @@ def main() -> None:
 
     try:
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind(("127.0.0.1", CAMERA_PORT))  # Bind to any interface, port 12345
+        server_socket.bind(("127.0.0.1", CAMERA_PORT))
         server_socket.close()
     except OSError:
         print("Cameras are already running!")

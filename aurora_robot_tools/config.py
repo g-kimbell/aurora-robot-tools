@@ -9,7 +9,7 @@ INPUT_DIR = Path("%userprofile%/Desktop/Inputs/")
 OUTPUT_DIR = Path("%userprofile%/Desktop/Outputs/")
 IMAGE_DIR = Path("C:/Aurora_images/")
 
-CAMERA_PORT = 65432
+CAMERA_PORT = 13865
 
 # Current step definitions
 STEP_DEFINITION = {
