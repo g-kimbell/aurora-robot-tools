@@ -93,28 +93,28 @@ class ChemspeedApp:
             self.tree.write(f, encoding="utf-8", xml_declaration=True)
 
 
-def get_bottom_rack_idx(cell: int) -> int:
-    """Get the index for the bottom rack from a cell number."""
-    if cell < 1 or cell > 18:
-        msg = "Cell number must be between 1 and 18 for bottom half."
+def get_bottom_rack_idx(rack_pos: int) -> int:
+    """Get the index for the bottom rack from a rack position."""
+    if rack_pos < 1 or rack_pos > 18:
+        msg = "Rack position must be between 1 and 18 for bottom half."
         raise ValueError(msg)
-    return (cell - 1) % 2 * 9 + (cell - 1) // 2
+    return (rack_pos - 1) % 2 * 9 + (rack_pos - 1) // 2
 
 
-def get_top_rack_idx(cell: int) -> int:
-    """Get the index for the top rack from a cell number."""
-    if cell < 19 or cell > 36:
-        msg = "Cell number must be between 19 and 36 for top half."
+def get_top_rack_idx(rack_pos: int) -> int:
+    """Get the index for the top rack from a rack position."""
+    if rack_pos < 19 or rack_pos > 36:
+        msg = "Rack position must be between 19 and 36 for top half."
         raise ValueError(msg)
-    return (cell - 1) % 2 * 9 + (cell - 19) // 2
+    return (rack_pos - 1) % 2 * 9 + (rack_pos - 19) // 2
 
 
-def get_full_rack_idx(cell: int) -> int:
-    """Get the index for a full rack from a cell number."""
-    if cell < 1 or cell > 36:
-        msg = "Cell number must be between 1 and 36."
+def get_full_rack_idx(rack_pos: int) -> int:
+    """Get the index for a full rack from a rack position."""
+    if rack_pos < 1 or rack_pos > 36:
+        msg = "Rack position must be between 1 and 36."
         raise ValueError(msg)
-    return (cell - 1) % 2 * 18 + (cell - 1) // 2
+    return (rack_pos - 1) % 2 * 18 + (rack_pos - 1) // 2
 
 
 def rectangular_grid(x0: float, dx: float, y0: float, dy: float, theta: float, nx: int = 2, ny: int = 9) -> np.ndarray:
@@ -216,13 +216,17 @@ def realign_app(
             print(f"Unknown file type {cpath.suffix}. Skipping.")
     df = pd.concat(dfs, ignore_index=True)
 
-    reference = df[(df["Step Number"] == 0) & (df["Cell Number"] == 0)]
+    if "Rack Position" not in df.columns:
+        df["Rack Position"] = df["Cell Number"]
+
+    reference = df[(df["Step Number"] == 0) & (df["Rack Position"] == 0)]
     if reference.empty:
         print("WARNING: No reference point found. Assuming camera is perfectly aligned.")
     else:
         # Make everything relative to the reference point
         print(
-            f"Found a reference with coordinates {reference['dx_mm'].to_numpy()[0]:.4f}, {reference['dy_mm'].to_numpy()[0]:.4f} mm"
+            "Found a reference with coordinates "
+            f"{reference['dx_mm'].to_numpy()[0]:.4f}, {reference['dy_mm'].to_numpy()[0]:.4f} mm"
         )
         df["dx_mm"] -= reference["dx_mm"].to_numpy()[0]
         df["dy_mm"] -= reference["dy_mm"].to_numpy()[0]
@@ -258,9 +262,9 @@ def realign_app(
 
                 # Filter the dataframe for the rack type
                 if rack_type == "Bottom rack":
-                    ffdf = fdf[fdf["Cell Number"] < 19]
+                    ffdf = fdf[fdf["Rack Position"] < 19]
                 elif rack_type == "Top rack":
-                    ffdf = fdf[fdf["Cell Number"] > 18]
+                    ffdf = fdf[fdf["Rack Position"] > 18]
                 elif rack_type == "Full rack":
                     ffdf = fdf
                 else:
@@ -286,12 +290,12 @@ def realign_app(
                 # to move PIECE +y move the 4NH +x
 
                 for _i, row in ffdf.iterrows():
-                    cell = int(row["Cell Number"])
+                    rack_pos = int(row["Rack Position"])
                     dx_mm = row["dx_mm"]
                     dy_mm = row["dy_mm"]
 
                     if rack_type == "Bottom rack":
-                        idx = get_bottom_rack_idx(cell)
+                        idx = get_bottom_rack_idx(rack_pos)
                         # the piece is +dx_mm too far in x
                         # to correct we move the piece -dx_mm in x
                         # so move the 4NH -dx_mm in y
@@ -303,7 +307,7 @@ def realign_app(
                         wells[idx][0] += dy_mm / 1000  # 4NH pickup x
                         wells_edited[idx][0] = wells[idx][0].copy()
                     elif rack_type == "Top rack":
-                        idx = get_top_rack_idx(cell)
+                        idx = get_top_rack_idx(rack_pos)
                         # the piece is +dx_mm too far in x
                         # to correct we move the piece -dx_mm in x
                         # we need to move the 4NH +dx_mm in y
@@ -317,7 +321,7 @@ def realign_app(
                     elif rack_type == "Full rack":
                         msg = "Full rack alignment not implemented."
                         raise ValueError(msg)
-                        idx = get_full_rack_idx(cell)
+                        idx = get_full_rack_idx(rack_pos)
 
                 # Fit to a rectangular grid if needed
                 if fit_to_grid:
