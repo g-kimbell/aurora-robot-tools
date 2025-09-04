@@ -66,16 +66,33 @@ def process_folder(
     """Process all images in a folder."""
     folder_path = Path(folder_path)
     # get all images with format cell_*_step_*.png
-    images = list(folder_path.glob("cell_*_step_*.png"))
+    images = [
+        *folder_path.glob("cell_*_step_*.png"),
+        *folder_path.glob("cell_*_rack_*_step_*.png"),
+        *folder_path.glob("cell_*_step_*.jpg"),
+        *folder_path.glob("cell_*_rack_*_step_*.jpg"),
+        *folder_path.glob("cell_*_step_*.jpeg"),
+        *folder_path.glob("cell_*_rack_*_step_*.jpeg"),
+    ]
     if len(images) == 0:
-        raise ValueError(f"No images found in {folder_path}.")
+        msg = f"No images found in {folder_path}."
+        raise ValueError(msg)
     alignments = []
     not_found = []
     for image_path in tqdm(images, desc="Processing images"):
         # get cell number and step number from filename
         parts = image_path.stem.split("_")
-        cell = int(parts[1])
-        step = int(parts[3])
+        if len(parts) == 4:
+            cell = int(parts[1])
+            rack = cell
+            step = int(parts[3])
+        elif len(parts) == 6:
+            cell = int(parts[1])
+            rack = int(parts[3])
+            step = int(parts[5])
+        else:
+            print(f"File {image_path.stem} not understood")
+            continue
         # read image
         image = cv2.imread(str(image_path))
         # detect circle
@@ -90,6 +107,7 @@ def process_folder(
         alignments.append(
             {
                 "Cell Number": cell,
+                "Rack Position": rack,
                 "Step Number": step,
                 "dx_mm": dx_mm,
                 "dy_mm": dy_mm,
@@ -102,7 +120,7 @@ def process_folder(
         image = cv2.line(image, (dx_px, dy_px - 10), (dx_px, dy_px + 10), (0, 0, 255), 2)
         image = cv2.line(image, (dx_px - 10, dy_px), (dx_px + 10, dy_px), (0, 0, 255), 2)
         # save image with new name
-        new_image_path = folder_path / f"detected/{image_path.stem}_detected.png"
+        new_image_path = folder_path / f"detected/{image_path.stem}_detected.jpg"
         new_image_path.parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(new_image_path), image)
     if len(not_found) > 0:
