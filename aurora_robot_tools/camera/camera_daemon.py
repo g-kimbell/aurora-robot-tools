@@ -1,6 +1,7 @@
 """Daemon for live view of bottom-up camera, listens for capture command."""
 
 import contextlib
+import logging
 import socket
 import sqlite3
 import threading
@@ -14,6 +15,8 @@ import zxingcpp
 
 from aurora_robot_tools.camera.ringlight import set_light
 from aurora_robot_tools.config import CAMERA_PORT, DATABASE_FILEPATH
+
+logger = logging.getLogger(__name__)
 
 PHOTO_PATH = Path("C:/Aurora_webcam_images/")
 
@@ -38,12 +41,12 @@ def socket_listener() -> None:
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind(("127.0.0.1", CAMERA_PORT))
     server_socket.listen(1)
-    print("Listening for connections...")
+    logger.info("Listening for connections...")
     while True:
         client_socket, addr = server_socket.accept()
-        print(f"Connection from {addr}")
+        logger.info("Connection from %", addr)
         data = client_socket.recv(1024).decode().strip()
-        print(f"Command: {data}")
+        logger.info("Command: %s", data)
         if data == "capturebottom" and last_frame_b is not None:
             capture_bottom(client_socket)
         if data == "capturebottomqr" and last_frame_b is not None:
@@ -55,11 +58,11 @@ def socket_listener() -> None:
 
 def capture_bottom(client_socket: socket.socket, read_qr: bool = False) -> None:
     """Capture an image from the bottom camera."""
-    print("Capturing from bottom camera")
+    logger.info("Capturing from bottom camera")
     if last_frame_b is None:
         sleep(1)
         if last_frame_b is None:
-            print("No frame captured from bottom camera")
+            logger.info("No frame captured from bottom camera")
             client_socket.sendall(b"1")
             return
     captured_frame = last_frame_b.copy()
@@ -104,22 +107,22 @@ def capture_bottom(client_socket: socket.socket, read_qr: bool = False) -> None:
         y = captured_frame.shape[0]
         dx_mm = (x // 2 - coords[0]) / mm_to_px
         dy_mm = (y // 2 - coords[1]) / mm_to_px
-        print(f"{dx_mm=}, {dy_mm=}")
+        logger.info("Misalignment x: %d mm, y: %d mm", dx_mm, dy_mm)
         if result[0] > 0:
             write_coords_to_db(result[0], result[1], dx_mm, dy_mm)
     else:
-        print("Could not detect circle")
+        logger.info("Could not detect circle")
     photo_path = PHOTO_PATH / run_id / "bottom_camera" / f"{label!s}.jpg"
     if not photo_path.parent.exists():
         photo_path.parent.mkdir(parents=True)
     cv2.imwrite(str(photo_path), captured_frame)
-    print(f"Frame saved as {photo_path!s}")
+    logger.info("Frame saved as %s", photo_path)
 
     # If QR, try to read it and update db
     if read_qr:
         qr = detect_qr_code(captured_frame)
         if qr:
-            print(f"Found QR code: {qr}")
+            logger.info("Found QR code: %s", qr)
             if cell_number:
                 with sqlite3.connect(DATABASE_FILEPATH) as conn:
                     cursor = conn.cursor()
@@ -127,11 +130,11 @@ def capture_bottom(client_socket: socket.socket, read_qr: bool = False) -> None:
                         "UPDATE Cell_Assembly_Table SET `Barcode` = ? WHERE `Cell Number` = ?",
                         (qr, cell_number),
                     )
-                print("Updated barcode in database")
+                logger.info("Updated barcode in database")
             else:
-                print("No cell number, cannot update database")
+                logger.info("No cell number, cannot update database")
         else:
-            print("Could not detect QR code")
+            logger.info("Could not detect QR code")
 
 
 def detect_qr_code(frame: np.ndarray) -> str | None:
@@ -144,11 +147,11 @@ def detect_qr_code(frame: np.ndarray) -> str | None:
 
 def capture_top(client_socket: socket.socket) -> None:
     """Capture an image from the top camera."""
-    print("Capturing from top camera")
+    logger.info("Capturing from top camera")
     if last_frame_t is None:
         sleep(1)
         if last_frame_t is None:
-            print("No frame captured from bottom camera")
+            logger.info("No frame captured from bottom camera")
             client_socket.sendall(b"1")
             return
     captured_frame_2 = last_frame_t.copy()
@@ -172,7 +175,7 @@ def capture_top(client_socket: socket.socket) -> None:
     if not photo_path.parent.exists():
         photo_path.parent.mkdir(parents=True)
     cv2.imwrite(str(photo_path), captured_frame_2)
-    print(f"Frame saved as {photo_path!s}")
+    logger.info("Frame saved as %s", photo_path)
 
 
 def write_coords_to_db(cell: int, step: int, dx_mm: float, dy_mm: float) -> None:
@@ -250,23 +253,23 @@ def main() -> None:
         server_socket.bind(("127.0.0.1", CAMERA_PORT))
         server_socket.close()
     except OSError:
-        print("Cameras are already running!")
+        logger.exception("Cameras are already running!")
         return
 
     try:
         set_light("party")
     except Exception:
-        print("Lights not working, continuing without...")
+        logger.exception("Lights not working, continuing without...")
 
     thread = threading.Thread(target=socket_listener, daemon=True)
     thread.start()
-    print("Started listening")
+    logger.info("Started listening")
 
-    print("Starting cameras, press q to quit.")
+    logger.critical("Starting cameras, press q to quit.")
 
     # Connect to first USB webcam with DirectShow
     try:
-        print("Loading bottom camera...")
+        logger.info("Loading bottom camera...")
         cam_b = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         cam_b.set(3, 10000)  # Set max frame size
         cam_b.set(4, 10000)
@@ -274,13 +277,13 @@ def main() -> None:
         cam_b.set(cv2.CAP_PROP_AUTOFOCUS, 0)
         cam_b.set(28, 1023)  # Set focus to closest distance
         ret, frame = cam_b.read()
-    except Exception as e:
+    except Exception:
         cam_b = None
-        print(f"Error loading bottom camera: {e}")
+        logger.exception("Error loading bottom camera")
 
     # Connect to first gxipy camera
     try:
-        print("Loading top camera...")
+        logger.info("Loading top camera...")
         device_manager = gx.DeviceManager()
         dev_num, dev_info_list = device_manager.update_device_list()
         cam_t = device_manager.open_device_by_index(1)
@@ -289,12 +292,12 @@ def main() -> None:
             cam_t.AcquisitionMode.set(gx.GxAcquisitionModeEntry.CONTINUOUS)
             cam_t.ExposureAuto.set(gx.GxAutoEntry.CONTINUOUS)
             cam_t.stream_on()
-    except Exception as e:
+    except Exception:
         cam_t = None
-        print(f"Error loading top camera: {e}")
+        logger.exception("Error loading top camera")
 
     if cam_b is None and cam_t is None:
-        print("No cameras available, exiting.")
+        logger.critical("No cameras available, exiting.")
         with contextlib.suppress(Exception):
             set_light("off")
         return
@@ -303,9 +306,9 @@ def main() -> None:
     try:
         set_light("b")
     except Exception:
-        print("Lights not working, continuing without...")
+        logger.exception("Lights not working, continuing without...")
 
-    print("Ready to capture images.")
+    logger.info("Ready to capture images.")
     try:
         while True:
             # Update bottom camera frame
