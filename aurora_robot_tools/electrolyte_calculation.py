@@ -2,15 +2,16 @@
 
 Determine the electrolyte mixing steps required.
 
-The script reads the electrolytes required and their volumes from the Cell_Assembly_Table in the 
-chemspeedDB database. It then reads the mixing ratios from the Electrolyte_Table and calculates all 
-the of the mixing steps (such as move 100 uL from vial 1 to vial 5, etc.) required to prepare all 
+The script reads the electrolytes required and their volumes from the Cell_Assembly_Table in the
+chemspeedDB database. It then reads the mixing ratios from the Electrolyte_Table and calculates all
+the of the mixing steps (such as move 100 uL from vial 1 to vial 5, etc.) required to prepare all
 electrolytes for the cells.
 
 Usage:
     The script is called from electrolyte_calculation.exe by the AutoSuite software.
     It can also be called from the command line.
 """
+
 import sqlite3
 import sys
 from pathlib import Path
@@ -29,6 +30,7 @@ def read_db(db_path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
         df_electrolyte = pd.read_sql("SELECT * FROM Electrolyte_Table", conn)
     return df, df_electrolyte
 
+
 def get_mix_fractions(df_electrolyte: pd.DataFrame) -> np.ndarray:
     """Get a square matrix of the mixture fractions."""
     # Initialise square matrix
@@ -36,7 +38,7 @@ def get_mix_fractions(df_electrolyte: pd.DataFrame) -> np.ndarray:
     mix_fractions = np.zeros((n, n))
     # Fill from electrolyte table
     for i in range(n):
-        mix_fractions[:, i] = df_electrolyte[f"Mix {i+1}"]
+        mix_fractions[:, i] = df_electrolyte[f"Mix {i + 1}"]
     # Make sure no nans and rows are normalised
     mix_fractions = np.nan_to_num(mix_fractions)
     for i in range(n):
@@ -44,11 +46,12 @@ def get_mix_fractions(df_electrolyte: pd.DataFrame) -> np.ndarray:
             mix_fractions[i] = mix_fractions[i] / mix_fractions[i].sum()  # normalise the row
     return mix_fractions
 
+
 def get_volumnes(
-        df: pd.DataFrame,
-        mix_fractions: np.ndarray,
-        safety_factor: float,
-    ) -> tuple[np.ndarray, np.ndarray]:
+    df: pd.DataFrame,
+    mix_fractions: np.ndarray,
+    safety_factor: float,
+) -> tuple[np.ndarray, np.ndarray]:
     """Calculate the volumes of electrolyte required.
 
     Cumulative volumes account for the electrolyte being used up in the mixing steps.
@@ -56,9 +59,7 @@ def get_volumnes(
     n = len(mix_fractions)
     volumes = np.zeros(n)
     for i in range(n):
-        mask = ((df["Electrolyte Position"] == i + 1)
-                & (df["Cell Number"] > 0)
-                & (df["Error Code"] == 0))
+        mask = (df["Electrolyte Position"] == i + 1) & (df["Cell Number"] > 0) & (df["Error Code"] == 0)
         volumes[i] = df.loc[mask, "Electrolyte Amount (uL)"].sum() * safety_factor
     cumulative_volumes = volumes
     remaining_volumes = volumes
@@ -66,6 +67,7 @@ def get_volumnes(
         remaining_volumes = np.matmul(remaining_volumes, mix_fractions)
         cumulative_volumes = cumulative_volumes + remaining_volumes
     return volumes, cumulative_volumes
+
 
 def make_mixing_steps(mixing_matrix: np.ndarray) -> pd.DataFrame:
     """Create dataframe containing list of mixing steps.
@@ -89,6 +91,7 @@ def make_mixing_steps(mixing_matrix: np.ndarray) -> pd.DataFrame:
         data=zip(source_positions, target_positions, volumes_to_mix),
     )
 
+
 def write_db(db_path: Path, df_electrolyte: pd.DataFrame, df_mixing_table: pd.DataFrame) -> None:
     """Write the electrolyte and mixing table back to the database."""
     with sqlite3.connect(db_path) as conn:
@@ -104,6 +107,7 @@ def write_db(db_path: Path, df_electrolyte: pd.DataFrame, df_mixing_table: pd.Da
                 "Volume (uL)": "REAL",
             },
         )
+
 
 def main(safety_factor: float = 1.1) -> None:
     """Determine the electrolyte mixing steps."""
@@ -130,6 +134,7 @@ def main(safety_factor: float = 1.1) -> None:
     write_db(DATABASE_FILEPATH, df_electrolyte, df_mixing_table)
 
     print("Successfully calculated the electrolyte mixing steps, wrote to Mixing_Table in database.")
+
 
 if __name__ == "__main__":
     safety_factor = float(sys.argv[1]) if len(sys.argv) >= 2 else 1.1

@@ -2,6 +2,7 @@
 
 Convert the finished database to a JSON file to go to aurora_cycler_manager.
 """
+
 import sqlite3
 import sys
 from datetime import datetime
@@ -11,9 +12,10 @@ from tkinter import Tk, filedialog
 import pandas as pd
 import pytz
 
-from aurora_robot_tools.config import DATABASE_FILEPATH, OUTPUT_DIR, TIME_ZONE, STEP_DEFINITION
+from aurora_robot_tools.config import DATABASE_FILEPATH, OUTPUT_DIR, STEP_DEFINITION, TIME_ZONE
 
 PRESS_STEP = next(k for k, v in STEP_DEFINITION.items() if v["Step"] == "Press")
+
 
 def read_db(db_path: Path, press_step: int) -> tuple[pd.DataFrame, pd.DataFrame, str]:
     """Read completed cells, timestamps, and run_id from robot database."""
@@ -23,7 +25,7 @@ def read_db(db_path: Path, press_step: int) -> tuple[pd.DataFrame, pd.DataFrame,
             conn,
         )
         df_timestamp = pd.read_sql(
-            "SELECT * FROM Timestamp_Table",
+            "SELECT * FROM Timestamp_Table WHERE `Complete` = 1",
             conn,
         )
         cursor = conn.cursor()
@@ -32,14 +34,15 @@ def read_db(db_path: Path, press_step: int) -> tuple[pd.DataFrame, pd.DataFrame,
     df["Run ID"] = run_id
     return df, df_timestamp, run_id
 
+
 def user_output_filepath(default_folder: Path, run_id: str) -> Path:
     """Ask user where to save the JSON file."""
     # Open file dialog to set the output file path
     Tk().withdraw()  # to hide the main window
     output_filepath = Path(
         filedialog.asksaveasfilename(
-            title = "Export chemspeed.db to .json",
-            filetypes = [("json files", "*.json")],
+            title="Export chemspeed.db to .json",
+            filetypes=[("json files", "*.json")],
             initialdir=default_folder,
             initialfile=f"{run_id}.json",
         ),
@@ -51,13 +54,14 @@ def user_output_filepath(default_folder: Path, run_id: str) -> Path:
         output_filepath = output_filepath.with_suffix(".json")
     return output_filepath
 
+
 def generate_assembly_history(timestamps: pd.Series) -> list:
     """Take a row of timestamps, turn into a list of dicts describing assembly history."""
     history = []
     timestamp_dict = timestamps.to_dict()
     for i in STEP_DEFINITION:
         # check if key exists
-        step: dict[str,str|int] = {}
+        step: dict[str, str | int] = {}
         ts = timestamp_dict.get(i)
         if ts and isinstance(ts, str):
             try:
@@ -75,13 +79,14 @@ def generate_assembly_history(timestamps: pd.Series) -> list:
             history.append(step)
     return history
 
+
 def generate_all_assembly_history(df: pd.DataFrame, df_timestamp: pd.DataFrame) -> pd.DataFrame:
     """Generate assembly history for all cells using the timestamp table."""
     # Drop nans, cast to int, sort by timestamp, drop duplicates
     df_timestamp = df_timestamp.dropna()
     df_timestamp["Step Number"] = df_timestamp["Step Number"].astype(int)
     df_timestamp["Cell Number"] = df_timestamp["Cell Number"].astype(int)
-    df_timestamp = df_timestamp.sort_values("Timestamp",ascending=False)
+    df_timestamp = df_timestamp.sort_values("Timestamp", ascending=False)
     df_timestamp = df_timestamp.drop_duplicates(["Cell Number", "Step Number"])
     # Pivot the table so that each step number is a column
     df_timestamp = df_timestamp.pivot_table(
@@ -94,6 +99,7 @@ def generate_all_assembly_history(df: pd.DataFrame, df_timestamp: pd.DataFrame) 
     df_timestamp["Assembly History"] = df_timestamp.apply(generate_assembly_history, axis=1)
     # Merge assembly history into the cell assembly table on cell number
     return df.merge(df_timestamp["Assembly History"], on="Cell Number")
+
 
 def main() -> None:
     """Export sample details from robot database to a JSON file."""
@@ -128,6 +134,7 @@ def main() -> None:
 
     # Output the file
     df.to_json(output_filepath, orient="records", indent=4)
+
 
 if __name__ == "__main__":
     main()
