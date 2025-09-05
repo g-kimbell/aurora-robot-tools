@@ -10,6 +10,7 @@ from time import sleep
 import cv2
 import gxipy as gx
 import numpy as np
+import zxingcpp
 
 from aurora_robot_tools.camera.ringlight import set_light
 from aurora_robot_tools.config import CAMERA_PORT, DATABASE_FILEPATH
@@ -45,12 +46,14 @@ def socket_listener() -> None:
         print(f"Command: {data}")
         if data == "capturebottom" and last_frame_b is not None:
             capture_bottom(client_socket)
+        if data == "capturebottomqr" and last_frame_b is not None:
+            capture_bottom(client_socket, read_qr=True)
         if data == "capturetop" and last_frame_t is not None:
             capture_top(client_socket)
         client_socket.close()
 
 
-def capture_bottom(client_socket: socket.socket) -> None:
+def capture_bottom(client_socket: socket.socket, read_qr: bool = False) -> None:
     """Capture an image from the bottom camera."""
     print("Capturing from bottom camera")
     if last_frame_b is None:
@@ -78,7 +81,7 @@ def capture_bottom(client_socket: socket.socket) -> None:
         cursor.execute(
             "SELECT `Rack Position`, `Anode Rack Position`, `Cathode Rack Position` "  # noqa: S608
             "FROM Cell_Assembly_Table "
-            f"WHERE `Cell Number` = {result[0]}",
+            f"WHERE `Cell Number` = {cell_number}",
         )
         result = cursor.fetchone()
         result = result if result else (0, 0, 0)
@@ -111,6 +114,32 @@ def capture_bottom(client_socket: socket.socket) -> None:
         photo_path.parent.mkdir(parents=True)
     cv2.imwrite(str(photo_path), captured_frame)
     print(f"Frame saved as {photo_path!s}")
+
+    # If QR, try to read it and update db
+    if read_qr:
+        qr = detect_qr_code(captured_frame)
+        if qr:
+            print(f"Found QR code: {qr}")
+            if cell_number:
+                with sqlite3.connect(DATABASE_FILEPATH) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "UPDATE Cell_Assembly_Table SET `Barcode` = ? WHERE `Cell Number` = ?",
+                        (qr, cell_number),
+                    )
+                print("Updated barcode in database")
+            else:
+                print("No cell number, cannot update database")
+        else:
+            print("Could not detect QR code")
+
+
+def detect_qr_code(frame: np.ndarray) -> str | None:
+    """Detect QR code from an image."""
+    results = zxingcpp.read_barcode(frame)
+    if results and len(results) == 1 and results[0].format.name == "QRCode" and results[0].content_type.name == "Text":
+        return results[0].text
+    return None
 
 
 def capture_top(client_socket: socket.socket) -> None:
@@ -260,7 +289,7 @@ def main() -> None:
             cam_t.AcquisitionMode.set(gx.GxAcquisitionModeEntry.CONTINUOUS)
             cam_t.ExposureAuto.set(gx.GxAutoEntry.CONTINUOUS)
             cam_t.stream_on()
-    except ValueError as e:
+    except Exception as e:
         cam_t = None
         print(f"Error loading top camera: {e}")
 

@@ -73,6 +73,12 @@ def bottom_photo() -> None:
 
     send_command("capturebottom")
 
+@app.command()
+def bottom_photo_qr() -> None:
+    """Save a photo from bottom-up camera, detect QR code, write to database."""
+    from aurora_robot_tools.camera.send_camera_command import send_command
+
+    send_command("capturebottomqr")
 
 @app.command()
 def output() -> None:
