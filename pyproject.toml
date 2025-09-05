@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "aurora-robot-tools"
 requires-python = ">=3.9"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
     "h5py>=3.14.0",
     "iai-gxipy>=2.0.2407.9061",
