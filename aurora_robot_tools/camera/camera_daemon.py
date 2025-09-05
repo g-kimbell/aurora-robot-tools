@@ -270,9 +270,6 @@ def main() -> None:
             set_light("off")
         return
 
-    thread = threading.Thread(target=socket_listener, daemon=True)
-    thread.start()
-
     # Set light to white to take photos
     try:
         set_light("b")
