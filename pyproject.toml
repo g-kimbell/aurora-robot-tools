@@ -1,11 +1,7 @@
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "aurora-robot-tools"
 requires-python = ">=3.9"
-version = "0.3.0"
+dynamic = ["version"]
 dependencies = [
     "h5py>=3.14.0",
     "iai-gxipy>=2.0.2407.9061",
@@ -23,6 +19,9 @@ dependencies = [
     "typer>=0.17.3",
     "xmltodict>=0.14.2",
 ]
+
+[tool.setuptools.dynamic]
+version = { attr = "aurora_robot_tools.version.__version__" }
 
 [project.optional-dependencies]
 dev = [
