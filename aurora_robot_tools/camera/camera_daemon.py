@@ -139,7 +139,7 @@ def capture_bottom(client_socket: socket.socket, read_qr: bool = False) -> None:
 
 def detect_qr_code(frame: np.ndarray) -> str | None:
     """Detect QR code from an image."""
-    results = zxingcpp.read_barcode(frame)
+    results = zxingcpp.read_barcodes(frame)
     if results and len(results) == 1 and results[0].format.name == "QRCode" and results[0].content_type.name == "Text":
         return results[0].text
     return None
