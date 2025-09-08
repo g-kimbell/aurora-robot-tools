@@ -44,7 +44,7 @@ def socket_listener() -> None:
     logger.info("Listening for connections...")
     while True:
         client_socket, addr = server_socket.accept()
-        logger.info("Connection from %", addr)
+        logger.info("Connection from %s", addr)
         data = client_socket.recv(1024).decode().strip()
         logger.info("Command: %s", data)
         if data == "capturebottom" and last_frame_b is not None:
@@ -253,13 +253,15 @@ def main() -> None:
         server_socket.bind(("127.0.0.1", CAMERA_PORT))
         server_socket.close()
     except OSError:
-        logger.exception("Cameras are already running!")
+        logger.critical("Cameras are already running!")
+        logger.debug("Exception details:", exc_info=True)
         return
 
     try:
         set_light("party")
     except Exception:
-        logger.exception("Lights not working, continuing without...")
+        logger.warning("Lights not working, continuing without...")
+        logger.debug("Exception details:", exc_info=True)
 
     thread = threading.Thread(target=socket_listener, daemon=True)
     thread.start()
@@ -279,7 +281,8 @@ def main() -> None:
         ret, frame = cam_b.read()
     except Exception:
         cam_b = None
-        logger.exception("Error loading bottom camera")
+        logger.warning("Bottom camera not available")
+        logger.debug("Exception details:", exc_info=True)
 
     # Connect to first gxipy camera
     try:
@@ -294,7 +297,8 @@ def main() -> None:
             cam_t.stream_on()
     except Exception:
         cam_t = None
-        logger.exception("Error loading top camera")
+        logger.warning("Top camera not available")
+        logger.debug("Exception details:", exc_info=True)
 
     if cam_b is None and cam_t is None:
         logger.critical("No cameras available, exiting.")
@@ -306,7 +310,8 @@ def main() -> None:
     try:
         set_light("b")
     except Exception:
-        logger.exception("Lights not working, continuing without...")
+        logger.warning("Lights not working, continuing without...")
+        logger.debug("Exception details:", exc_info=True)
 
     logger.info("Ready to capture images.")
     try:
